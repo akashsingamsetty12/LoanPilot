@@ -1,5 +1,5 @@
 """
-Prompt templates for Module 4 document classification and extraction.
+Prompt templates for LoanPilot document classification and field extraction.
 """
 
 CLASSIFICATION_SYSTEM_PROMPT = """

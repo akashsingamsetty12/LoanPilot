@@ -1,7 +1,7 @@
 import re
 from typing import Dict, Any, Optional, Union
-from module4.config import settings
-from module4.schemas import ExtractedField
+from config import get_settings
+from schemas.extraction import ExtractedField
 
 
 def parse_numeric_value(val: Any) -> Optional[Union[float, int]]:
@@ -49,13 +49,16 @@ def parse_numeric_value(val: Any) -> Optional[Union[float, int]]:
         return None
 
 
-def evaluate_extracted_field(field_data: Any, threshold: float = settings.CONFIDENCE_THRESHOLD) -> ExtractedField:
+def evaluate_extracted_field(field_data: Any, threshold: Optional[float] = None) -> ExtractedField:
     """
     Evaluates raw dictionary or ExtractedField object from LLM response,
     computes numeric confidence, and flags needs_review according to rules:
     - If value is None or empty string -> needs_review = True, confidence = 0.0
     - If confidence < threshold -> needs_review = True
     """
+    if threshold is None:
+        threshold = get_settings().CONFIDENCE_THRESHOLD
+
     if isinstance(field_data, ExtractedField):
         val = field_data.value
         conf = float(field_data.confidence or 0.0)
@@ -97,8 +100,10 @@ def evaluate_extracted_field(field_data: Any, threshold: float = settings.CONFID
     )
 
 
-def process_fields_confidence(raw_fields: Dict[str, Any], threshold: float = settings.CONFIDENCE_THRESHOLD) -> Dict[str, ExtractedField]:
+def process_fields_confidence(raw_fields: Dict[str, Any], threshold: Optional[float] = None) -> Dict[str, ExtractedField]:
     """Applies confidence evaluation to all fields extracted for a document."""
+    if threshold is None:
+        threshold = get_settings().CONFIDENCE_THRESHOLD
     processed: Dict[str, ExtractedField] = {}
     for field_name, raw_val in raw_fields.items():
         processed[field_name] = evaluate_extracted_field(raw_val, threshold=threshold)

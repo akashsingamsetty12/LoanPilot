@@ -62,9 +62,6 @@ register_exception_handlers(app)
 for router in all_routers:
     app.include_router(router, prefix="/api/v1")
 
-from module4.routes import router as module4_router
-app.include_router(module4_router, prefix="/api/v1/module4")
-
 
 # ── Health Check ──
 

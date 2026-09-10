@@ -35,8 +35,12 @@ class Settings(BaseSettings):
 
     # ── LLM API ──
     OPENAI_API_KEY: str = ""
+    GEMINI_API_KEY: str = ""
     LLM_MODEL: str = "gpt-4o"
-    LLM_PROVIDER: str = "openai"  # "openai" | "anthropic"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    LLM_PROVIDER: str = "openai"  # "openai" | "gemini" | "mock" | "anthropic"
+    CONFIDENCE_THRESHOLD: float = 0.70
 
     # ── File Storage ──
     UPLOAD_DIR: str = "./uploads"
