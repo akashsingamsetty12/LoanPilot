@@ -3,41 +3,136 @@ Extraction & Classification Schemas
 =====================================
 Request/response models for document classification and field extraction.
 
-
 Endpoints:
   POST  /api/v1/documents/{id}/classify  → ClassificationResult
   POST  /api/v1/documents/{id}/extract   → ExtractionResult
 """
 
-from typing import Optional
-from pydantic import BaseModel, Field
+from typing import List, Optional, Any, Dict
+from enum import Enum
+from pydantic import BaseModel, Field, model_validator
 
-from schemas.common import FieldValue
 
+class DocumentType(str, Enum):
+    PAYSLIP = "payslip"
+    BANK_STATEMENT = "bank_statement"
+    TAX_RETURN = "tax_return"
+    KYC_IDENTITY = "kyc_identity"
+    ADDRESS_PROOF = "address_proof"
+    OTHER = "other"
+
+
+# --- Input Schemas ---
+
+class OCRPage(BaseModel):
+    page: int = Field(..., description="1-indexed page number")
+    text: str = Field(..., description="Extracted text from OCR for this page")
+    ocr_confidence: float = Field(default=1.0, ge=0.0, le=1.0, description="OCR engine confidence score")
+
+
+class OCRDocumentInput(BaseModel):
+    document_id: str = Field(..., description="Unique document identifier")
+    filename: Optional[str] = Field(default=None, description="Original filename of the document")
+    pages: List[OCRPage] = Field(..., min_length=1, description="List of OCR page data")
+    ocr_confidence: Optional[float] = Field(default=None, description="Overall OCR confidence")
+
+    @model_validator(mode="after")
+    def compute_ocr_confidence(self) -> "OCRDocumentInput":
+        if self.ocr_confidence is None and self.pages:
+            confidences = [p.ocr_confidence for p in self.pages if p.ocr_confidence is not None]
+            if confidences:
+                self.ocr_confidence = round(sum(confidences) / len(confidences), 4)
+            else:
+                self.ocr_confidence = 1.0
+        return self
+
+
+# --- Output Base Field Schema ---
+
+class ExtractedField(BaseModel):
+    value: Optional[Any] = Field(default=None, description="Extracted value (string, float, int, etc.)")
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="Extraction confidence score (0.0 to 1.0)")
+    page: Optional[int] = Field(default=None, description="Page number where the field was found")
+    needs_review: bool = Field(default=False, description="Flagged for manual review if low confidence or missing")
+    source_document: Optional[str] = Field(default=None, description="Source document ID")
+
+
+# --- Classification Schema ---
 
 class ClassificationResult(BaseModel):
-    """Result of LLM-based document classification."""
-    document_id: str
-    doc_type: str = Field(
-        ...,
-        description="payslip | bank_statement | tax_return | kyc_identity | address_proof | other",
-    )
-    confidence: float = Field(..., ge=0.0, le=1.0)
-    reasoning: Optional[str] = None
+    document_id: str = Field(..., description="Target document ID")
+    document_type: DocumentType = Field(..., description="Classified document category")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Classification confidence score")
+    reason: str = Field(default="", description="LLM rationale for the assigned classification")
+    doc_type: Optional[str] = Field(default=None, description="Alias for document_type for API compatibility")
+    reasoning: Optional[str] = Field(default=None, description="Alias for reason for API compatibility")
 
+    @model_validator(mode="after")
+    def sync_aliases(self) -> "ClassificationResult":
+        dt_val = self.document_type.value if isinstance(self.document_type, Enum) else str(self.document_type)
+        if self.doc_type is None:
+            self.doc_type = dt_val
+        if self.reasoning is None:
+            self.reasoning = self.reason
+        if not self.reason and self.reasoning:
+            self.reason = self.reasoning
+        return self
+
+
+# --- Document Specific Field Schemas ---
+
+class PayslipFields(BaseModel):
+    name: ExtractedField = Field(default_factory=ExtractedField)
+    employer: ExtractedField = Field(default_factory=ExtractedField)
+    pay_period: ExtractedField = Field(default_factory=ExtractedField)
+    gross_salary: ExtractedField = Field(default_factory=ExtractedField)
+    net_salary: ExtractedField = Field(default_factory=ExtractedField)
+
+
+class BankStatementFields(BaseModel):
+    account_holder: ExtractedField = Field(default_factory=ExtractedField)
+    bank: ExtractedField = Field(default_factory=ExtractedField)
+    statement_period: ExtractedField = Field(default_factory=ExtractedField)
+    salary_credits: ExtractedField = Field(default_factory=ExtractedField)
+    average_monthly_credit: ExtractedField = Field(default_factory=ExtractedField)
+
+
+class TaxReturnFields(BaseModel):
+    taxpayer_name: ExtractedField = Field(default_factory=ExtractedField)
+    assessment_year: ExtractedField = Field(default_factory=ExtractedField)
+    declared_income: ExtractedField = Field(default_factory=ExtractedField)
+
+
+class KYCIdentityFields(BaseModel):
+    name: ExtractedField = Field(default_factory=ExtractedField)
+    DOB: ExtractedField = Field(default_factory=ExtractedField)
+    address: ExtractedField = Field(default_factory=ExtractedField)
+    ID_number: ExtractedField = Field(default_factory=ExtractedField)
+
+
+class AddressProofFields(BaseModel):
+    name: ExtractedField = Field(default_factory=ExtractedField)
+    address: ExtractedField = Field(default_factory=ExtractedField)
+    document_issuer: ExtractedField = Field(default_factory=ExtractedField)
+    issue_date: ExtractedField = Field(default_factory=ExtractedField)
+
+
+# --- Unified Canonical Output Schema ---
 
 class ExtractionResult(BaseModel):
-    """
-    Structured fields extracted from a document via LLM.
-
-    Expected field keys per doc_type:
-      payslip:        name, employer, pay_period, gross_salary, net_salary, deductions
-      bank_statement: account_holder, bank_name, statement_period, salary_credits,
-                      avg_monthly_credit, closing_balance
-      tax_return:     taxpayer_name, pan_number, assessment_year, declared_income, tax_paid
-      kyc_identity:   name, dob, id_type, id_number, address
-      address_proof:  name, address, document_type, issue_date
-    """
     document_id: str
-    doc_type: str
-    fields: dict[str, FieldValue]
+    document_type: DocumentType
+    type: Optional[DocumentType] = None
+    doc_type: Optional[str] = None
+    filename: Optional[str] = None
+    ocr_confidence: Optional[float] = None
+    fields: Dict[str, ExtractedField] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def sync_aliases(self) -> "ExtractionResult":
+        if self.type is None:
+            self.type = self.document_type
+        dt_val = self.document_type.value if isinstance(self.document_type, Enum) else str(self.document_type)
+        if self.doc_type is None:
+            self.doc_type = dt_val
+        return self
