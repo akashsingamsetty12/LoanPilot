@@ -16,6 +16,7 @@ from schemas.application import (
     ApplicationListResponse,
     DecisionRequest,
 )
+from services.ingestion import create_application as create_application_service
 
 router = APIRouter(prefix="/applications", tags=["Applications"])
 
@@ -26,7 +27,7 @@ async def create_application(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a new loan application."""
-    # TODO: Call services.ingestion.create_application()
+    return await create_application_service(request, db)
     pass
 
 

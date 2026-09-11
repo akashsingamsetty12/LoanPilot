@@ -1,79 +1,151 @@
 """
 Document Ingestion Service
 =======================================
-Handles file upload validation, storage, status tracking, and metadata creation.
-
-
-Data flow:
-  Upload → validate file → generate IDs → save to disk → create DB record → push to OCR queue
-
-Dependencies:
-  - utils/file_helpers.py (file validation, path generation)
-  - utils/id_generator.py (APP/DOC ID generation)
-  - models/application.py, models/document.py
-
-Input:  UploadFile from FastAPI
-Output: Document record in DB with status="uploaded"
+Handles application creation, file upload,
+validation, storage, and document metadata.
 """
 
+from datetime import datetime, timezone
+
 from fastapi import UploadFile
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from models.application import Application
+from models.document import Document
 from schemas.application import CreateApplicationRequest, ApplicationSummary
 from schemas.document import DocumentUploadResponse
+from utils.file_helpers import (
+    validate_file_type,
+    validate_file_size,
+    get_upload_path,
+)
+from utils.id_generator import generate_application_id, generate_document_id
 
 
 async def create_application(
     request: CreateApplicationRequest,
     db: AsyncSession,
 ) -> ApplicationSummary:
-    """
-    Create a new loan application.
+    """Create a new loan application."""
 
-    Steps:
-      1. Generate application ID (APP-XXXX)
-      2. Create Application record in DB
-      3. Return ApplicationSummary
+    application = Application(
+        id=generate_application_id(),
+        applicant_name=request.applicant_name,
+        kaggle_loan_id=request.kaggle_loan_id,
+        status="created",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
 
-    TODO: implement this
-    """
-    raise NotImplementedError("create_application() is not implemented")
+    db.add(application)
+    await db.flush()
 
+    return ApplicationSummary(
+        id=application.id,
+        applicant_name=application.applicant_name,
+        status=application.status,
+        document_count=0,
+        risk_level=application.risk_level,
+        recommendation=application.recommendation,
+        created_at=application.created_at,
+    )
 
 async def upload_document(
     app_id: str,
     file: UploadFile,
     db: AsyncSession,
 ) -> DocumentUploadResponse:
-    """
-    Upload a single document for a loan application.
+    """Upload and register a single loan document."""
 
-    Steps:
-      1. Validate file type (PDF/JPG/PNG) using utils/file_helpers.validate_file_type()
-      2. Validate file size using utils/file_helpers.validate_file_size()
-      3. Generate document ID (DOC-XXXX)
-      4. Save file to disk: uploads/{app_id}/{doc_id}/{filename}
-      5. Create Document record in DB with status="uploaded"
-      6. Return DocumentUploadResponse
+    # Check application exists
+    result = await db.execute(
+        select(Application).where(Application.id == app_id)
+    )
+    application = result.scalar_one_or_none()
 
-    TODO: implement this
-    """
-    raise NotImplementedError("upload_document() is not implemented")
+    if application is None:
+        raise ValueError(f"Application not found: {app_id}")
+
+    # Validate file type
+    if not file.content_type or not validate_file_type(file.content_type):
+        raise ValueError(
+            "Unsupported file type. Use PDF, JPG or PNG."
+        )
+
+    # Read file
+    content = await file.read()
+
+    # Validate file size
+    if not validate_file_size(len(content)):
+        raise ValueError("File size exceeds the allowed limit.")
+
+    # Generate document ID
+    doc_id = generate_document_id()
+
+    # Generate upload path
+    upload_path = get_upload_path(
+        app_id,
+        doc_id,
+        file.filename or "document",
+    )
+
+    # Save file
+    upload_path.write_bytes(content)
+
+    # Create database record
+    document = Document(
+        id=doc_id,
+        application_id=app_id,
+        filename=file.filename or "document",
+        file_path=str(upload_path),
+        file_type=file.content_type,
+        file_size=len(content),
+        status="uploaded",
+        doc_type="unclassified",
+    )
+
+    db.add(document)
+
+    # Update application status
+    application.status = "documents_uploaded"
+    application.updated_at = datetime.now(timezone.utc)
+
+    await db.flush()
+
+    return DocumentUploadResponse(
+        document_id=document.id,
+        filename=document.filename,
+        file_type=document.file_type,
+        status=document.status,
+    )
 
 
 async def get_document_status(doc_id: str, db: AsyncSession) -> dict:
-    """
-    Get the processing status of a document.
+    """Get the processing status of a document."""
 
-    TODO: implement this
-    """
-    raise NotImplementedError("get_document_status() is not implemented")
+    result = await db.execute(
+        select(Document).where(Document.id == doc_id)
+    )
+    document = result.scalar_one_or_none()
+
+    if document is None:
+        raise ValueError(f"Document not found: {doc_id}")
+
+    return {
+        "document_id": document.id,
+        "status": document.status,
+        "error_message": document.error_message,
+    }
 
 
 async def list_documents(app_id: str, db: AsyncSession) -> list:
-    """
-    List all documents for an application.
+    """List all documents for an application."""
 
-    TODO: implement this
-    """
-    raise NotImplementedError("list_documents() is not implemented")
+    result = await db.execute(
+        select(Document)
+        .where(Document.application_id == app_id)
+        .order_by(Document.created_at)
+    )
+
+    return list(result.scalars().all())
