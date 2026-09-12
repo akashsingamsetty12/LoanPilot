@@ -28,7 +28,6 @@ async def create_application(
     db: AsyncSession,
 ) -> ApplicationSummary:
     """Create a new loan application."""
-
     application = Application(
         id=generate_application_id(),
         applicant_name=request.applicant_name,
@@ -39,7 +38,8 @@ async def create_application(
     )
 
     db.add(application)
-    await db.flush()
+    await db.commit()
+    await db.refresh(application)
 
     return ApplicationSummary(
         id=application.id,
@@ -50,6 +50,7 @@ async def create_application(
         recommendation=application.recommendation,
         created_at=application.created_at,
     )
+
 
 async def upload_document(
     app_id: str,
@@ -69,9 +70,7 @@ async def upload_document(
 
     # Validate file type
     if not file.content_type or not validate_file_type(file.content_type):
-        raise ValueError(
-            "Unsupported file type. Use PDF, JPG or PNG."
-        )
+        raise ValueError("Unsupported file type. Use PDF, JPG, JPEG or PNG.")
 
     # Read file
     content = await file.read()
@@ -89,6 +88,7 @@ async def upload_document(
         doc_id,
         file.filename or "document",
     )
+    upload_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Save file
     upload_path.write_bytes(content)
@@ -103,6 +103,7 @@ async def upload_document(
         file_size=len(content),
         status="uploaded",
         doc_type="unclassified",
+        created_at=datetime.now(timezone.utc),
     )
 
     db.add(document)
@@ -111,7 +112,8 @@ async def upload_document(
     application.status = "documents_uploaded"
     application.updated_at = datetime.now(timezone.utc)
 
-    await db.flush()
+    await db.commit()
+    await db.refresh(document)
 
     return DocumentUploadResponse(
         document_id=document.id,
@@ -123,7 +125,6 @@ async def upload_document(
 
 async def get_document_status(doc_id: str, db: AsyncSession) -> dict:
     """Get the processing status of a document."""
-
     result = await db.execute(
         select(Document).where(Document.id == doc_id)
     )
@@ -141,11 +142,9 @@ async def get_document_status(doc_id: str, db: AsyncSession) -> dict:
 
 async def list_documents(app_id: str, db: AsyncSession) -> list:
     """List all documents for an application."""
-
     result = await db.execute(
         select(Document)
         .where(Document.application_id == app_id)
         .order_by(Document.created_at)
     )
-
     return list(result.scalars().all())
