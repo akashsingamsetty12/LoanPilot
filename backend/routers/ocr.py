@@ -2,13 +2,13 @@
 OCR Router
 =======================
 Trigger OCR processing on uploaded documents.
-
 """
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
+from services.ocr import process_document
 
 router = APIRouter(prefix="/documents", tags=["OCR"])
 
@@ -19,5 +19,4 @@ async def trigger_ocr(
     db: AsyncSession = Depends(get_db),
 ):
     """Trigger OCR processing for a document."""
-    # TODO: Call services.ocr.process_document()
-    pass
+    return await process_document(doc_id, db)

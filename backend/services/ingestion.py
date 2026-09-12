@@ -1,13 +1,12 @@
 """
 Document Ingestion Service
 =======================================
-Handles file upload validation, storage, status tracking, and metadata creation.
-
-Data flow:
-  Upload → validate file → generate IDs → save to disk → create DB record → ready for OCR
+Handles application creation, file upload,
+validation, storage, and document metadata.
 """
 
 from datetime import datetime, timezone
+
 from fastapi import UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -58,7 +57,9 @@ async def upload_document(
     file: UploadFile,
     db: AsyncSession,
 ) -> DocumentUploadResponse:
-    """Upload and store a single document for a loan application."""
+    """Upload and register a single loan document."""
+
+    # Check application exists
     result = await db.execute(
         select(Application).where(Application.id == app_id)
     )
@@ -67,23 +68,32 @@ async def upload_document(
     if application is None:
         raise ValueError(f"Application not found: {app_id}")
 
+    # Validate file type
     if not file.content_type or not validate_file_type(file.content_type):
         raise ValueError("Unsupported file type. Use PDF, JPG, JPEG or PNG.")
 
+    # Read file
     content = await file.read()
 
+    # Validate file size
     if not validate_file_size(len(content)):
         raise ValueError("File size exceeds the allowed limit.")
 
+    # Generate document ID
     doc_id = generate_document_id()
+
+    # Generate upload path
     upload_path = get_upload_path(
         app_id,
         doc_id,
         file.filename or "document",
     )
     upload_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Save file
     upload_path.write_bytes(content)
 
+    # Create database record
     document = Document(
         id=doc_id,
         application_id=app_id,
@@ -98,6 +108,7 @@ async def upload_document(
 
     db.add(document)
 
+    # Update application status
     application.status = "documents_uploaded"
     application.updated_at = datetime.now(timezone.utc)
 
