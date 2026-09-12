@@ -39,7 +39,17 @@ class Settings(BaseSettings):
     LLM_MODEL: str = "gpt-4o"
     GEMINI_MODEL: str = "gemini-2.5-flash"
     OPENAI_MODEL: str = "gpt-4o-mini"
-    LLM_PROVIDER: str = "openai"  # "openai" | "gemini" | "mock" | "anthropic"
+    LLM_PROVIDER: str = "bedrock"  # "bedrock" | "openai" | "local" | "gemini"
+    ENABLE_OPENAI_FALLBACK: bool = True
+    ENABLE_LOCAL_FALLBACK: bool = True
+    BEDROCK_REGION: str = "us-east-1"
+    BEDROCK_MODEL_ID: str = "anthropic.claude-3-5-sonnet-20240620-v1:0"
+    AWS_ACCESS_KEY_ID: str = ""
+    AWS_SECRET_ACCESS_KEY: str = ""
+    MAX_AGENT_TURNS: int = 5
+    POLICY_RAG_DIR: str = "./data/policies"
+    POLICY_INDEX_DIR: str = "./data/policy_index"
+    EMBEDDING_MODEL: str = "BAAI/bge-small-en-v1.5"
     CONFIDENCE_THRESHOLD: float = 0.70
 
     # ── File Storage ──

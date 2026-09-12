@@ -8,7 +8,7 @@ import api from './client';
 const BASE = '/api/v1';
 
 export const askLoanPilot = (appId, question, conversationId = null) =>
-  api.post(`${BASE}/applications/${appId}/agent/query`, {
+  api.post(`${BASE}/applications/${appId}/agent`, {
     question,
     conversation_id: conversationId,
   });

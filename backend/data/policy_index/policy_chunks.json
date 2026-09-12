@@ -1,0 +1,72 @@
+[
+  {
+    "text": "The residential address listed on the loan application must be verified against: 1. Official KYC Identity Document (Aadhaar, Passport, Voter ID) 2. Recent Utility Bill or Lease Agreement (issued within the last 90 days)",
+    "source": "address_verification_policy.md",
+    "section": "1. Primary Address Proof Validation"
+  },
+  {
+    "text": "- Address matching utilizes fuzzy string comparison for minor formatting variations (e.g., \"Street\" vs \"St\", \"Apartment\" vs \"Apt\", postal zip codes). - Address variations with > 80% similarity threshold are marked as MATCH. - Address mismatches below 80% similarity are assigned a MEDIUM risk flag (+10 pts) and require officer verification of proof of residency.",
+    "source": "address_verification_policy.md",
+    "section": "2. Address Matching Rules"
+  },
+  {
+    "text": "This policy outlines the standard operating procedures for verifying applicant income across submitted financial documents including payslips, bank statements, and income tax returns (ITR).",
+    "source": "income_verification_policy.md",
+    "section": "1. Overview and Scope"
+  },
+  {
+    "text": "- **Acceptable Variation**: An annual income variation of up to 10% between declared income, payslip projection (monthly net x 12), and tax return declared income is considered acceptable due to variable bonuses, tax deductions, or seasonal overtime. - **Medium Risk Discrepancy (10% - 20%)**: Income mismatches between 10% and 20% must be flagged for underwriting review. The loan officer must check bank statement salary credit amounts to verify actual cash flow. - **High Risk Discrepancy (> 20%)**: Income discrepancies exceeding 20% across documents indicate potential document alteration or misrepresentation. High risk flags require explicit human underwriter sign-off and secondary document verification.",
+    "source": "income_verification_policy.md",
+    "section": "2. Salary and Income Discrepancies"
+  },
+  {
+    "text": "- Salaried applicants must provide at least 3 consecutive months of payslips and 6 months of bank account statements. - Self-employed applicants must provide 2 consecutive years of audited Income Tax Returns along with profit & loss statements.",
+    "source": "income_verification_policy.md",
+    "section": "3. Required Document Proofs"
+  },
+  {
+    "text": "Each uploaded application document must be classified into one of the canonical document types: - `payslip`: Salary slip, pay stub, or wage slip showing gross and net earnings. - `bank_statement`: Official bank account statement showing monthly transaction history and salary credits. - `tax_return`: Form 16, Income Tax Return (ITR), or official tax assessment. - `kyc_identity`: Passport, Aadhaar card, PAN card, or Driver's License. - `address_proof`: Utility bill (electricity, water, gas) or residential lease agreement.",
+    "source": "loan_documentation_sop.md",
+    "section": "1. Document Classification Standards"
+  },
+  {
+    "text": "- Primary applicant name must match across all submitted documents using fuzzy matching with a minimum 85% similarity threshold. - Name variations due to middle name initials, honorifics (Mr./Ms./Dr.), or maiden names must be verified against government KYC identity proofs.",
+    "source": "loan_documentation_sop.md",
+    "section": "2. Name Consistency Matching"
+  },
+  {
+    "text": "- Every risk flag or discrepancy cited during investigation MUST reference specific source document IDs, page numbers, and extracted values (e.g., \"DOC-001 p.1 vs DOC-003 p.2\").",
+    "source": "loan_documentation_sop.md",
+    "section": "3. Evidence Citation Protocol"
+  },
+  {
+    "text": "LoanPilot utilizes a transparent, rule-based risk scoring model (0-100 scale). Black-box ML models are excluded to ensure 100% explainability.",
+    "source": "risk_assessment_guidelines.md",
+    "section": "1. Transparent Scoring Model"
+  },
+  {
+    "text": "- **+20 points**: Missing required document (per missing document). - **+25 points**: Name discrepancy across documents (< 85% fuzzy match). - **+30 points**: Income discrepancy > 20% (HIGH severity). - **+15 points**: Income discrepancy 10% - 20% (MEDIUM severity). - **+10 points**: Address mismatch between KYC and utility bill (MEDIUM severity). - **+10 points**: Pay period / statement date inconsistency. - **+5 points**: Low OCR extraction confidence (< 0.80).",
+    "source": "risk_assessment_guidelines.md",
+    "section": "2. Risk Scoring Penalty Deductions"
+  },
+  {
+    "text": "Every assigned score point must be supported by an verifiable evidence snippet citing the exact document page and extracted value.",
+    "source": "risk_assessment_guidelines.md",
+    "section": "3. Mandatory Evidence Traceability"
+  },
+  {
+    "text": "- **Mandatory Human-in-the-Loop Rule**: Underwriting systems, AI investigation agents, and automated risk scoring tools are strictly advisory. Automated systems are PROHIBITED from executing final loan approvals or rejections without a licensed human loan officer's manual decision. - All AI recommendations must default to `NEEDS_HUMAN_REVIEW` whenever risk flags or document discrepancies are identified.",
+    "source": "underwriting_guidelines.md",
+    "section": "1. Human Officer Final Decision Requirement"
+  },
+  {
+    "text": "- **LOW Risk (Score 0 - 30)**: Standard processing path. Basic cross-document verification passed with high confidence. - **MEDIUM Risk (Score 31 - 60)**: Requires targeted loan officer review of highlighted field discrepancies (e.g. minor address variation or date discrepancy). - **HIGH Risk (Score 61 - 100)**: Requires full underwriting audit, mandatory supervisor escalation, and secondary background check.",
+    "source": "underwriting_guidelines.md",
+    "section": "2. Risk Level Classifications"
+  },
+  {
+    "text": "- Any request asking the AI system to \"approve\" or \"reject\" an application must be formally refused with a redirection to the human underwriting officer.",
+    "source": "underwriting_guidelines.md",
+    "section": "3. Decision Refusal and Safeguards"
+  }
+]
