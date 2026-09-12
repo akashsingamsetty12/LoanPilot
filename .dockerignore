@@ -1,0 +1,13 @@
+node_modules/
+frontend/node_modules/
+__pycache__/
+*.pyc
+.git/
+.venv/
+venv/
+dist/
+build/
+*.db
+uploads/
+backend/uploads/
+.env
