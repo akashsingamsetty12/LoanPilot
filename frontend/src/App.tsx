@@ -16,6 +16,7 @@ export function App() {
           <Route path="/applications/:id" element={<ApplicationReview />} />
           <Route path="/applications/:id/review" element={<ApplicationReview />} />
           <Route path="/applications/:id/report" element={<Report />} />
+          <Route path="/reports" element={<Navigate to="/applications/APP-0001/report" replace />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
