@@ -104,9 +104,99 @@ def build_risk_response(application_id: str, verification_result: dict) -> dict:
     }
 
 
-async def assess_risk(app_id: str, db) -> dict:
-    """Integration placeholder: load Module 5 result from DB in your backend.
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-    Keep database-specific persistence in the team's existing integration layer.
-    """
-    raise NotImplementedError("Connect this function to the existing VerificationResult database model.")
+from models.application import Application
+from models.verification import VerificationResult
+from models.risk import RiskAssessment
+from schemas.risk import RiskResponse
+
+
+async def assess_risk(app_id: str, db: AsyncSession) -> RiskResponse:
+    """Load Module 5 VerificationResult from DB, calculate score & flags, and persist RiskAssessment."""
+    # 1. Fetch VerificationResult
+    vr_stmt = select(VerificationResult).where(VerificationResult.application_id == app_id)
+    vr_res = await db.execute(vr_stmt)
+    vr = vr_res.scalar_one_or_none()
+
+    verification_data = {}
+    if vr:
+        findings = []
+        if isinstance(vr.mismatches, list):
+            findings.extend(vr.mismatches)
+        missing_docs = vr.missing_documents if isinstance(vr.missing_documents, list) else []
+        verification_data = {
+            "verification_findings": findings,
+            "missing_documents": missing_docs,
+        }
+
+    # 2. Calculate score and flags
+    score, flags = calculate_risk_score(verification_data)
+    level = score_to_level(score)
+    summary = "; ".join(flag.reason for flag in flags)
+    flags_dump = [f.model_dump() for f in flags]
+
+    # 3. Upsert RiskAssessment in DB
+    risk_stmt = select(RiskAssessment).where(RiskAssessment.application_id == app_id)
+    risk_res = await db.execute(risk_stmt)
+    risk_record = risk_res.scalar_one_or_none()
+
+    if risk_record:
+        risk_record.score = score
+        risk_record.level = level
+        risk_record.flags = flags_dump
+        risk_record.recommendation = "NEEDS_HUMAN_REVIEW"
+        risk_record.summary = summary
+    else:
+        risk_record = RiskAssessment(
+            application_id=app_id,
+            score=score,
+            level=level,
+            flags=flags_dump,
+            recommendation="NEEDS_HUMAN_REVIEW",
+            summary=summary,
+        )
+        db.add(risk_record)
+
+    # 4. Update Application risk fields
+    app_stmt = select(Application).where(Application.id == app_id)
+    app_res = await db.execute(app_stmt)
+    app = app_res.scalar_one_or_none()
+    if app:
+        app.risk_score = score
+        app.risk_level = level
+        app.recommendation = "NEEDS_HUMAN_REVIEW"
+
+    await db.commit()
+    await db.refresh(risk_record)
+
+    return RiskResponse(
+        application_id=app_id,
+        score=score,
+        level=level,
+        flags=flags,
+        recommendation="NEEDS_HUMAN_REVIEW",
+        summary=summary,
+    )
+
+
+async def get_risk_assessment(app_id: str, db: AsyncSession) -> RiskResponse:
+    """Retrieve existing RiskAssessment or calculate on demand."""
+    stmt = select(RiskAssessment).where(RiskAssessment.application_id == app_id)
+    res = await db.execute(stmt)
+    risk_record = res.scalar_one_or_none()
+
+    if risk_record:
+        flags_data = [Flag(**f) if isinstance(f, dict) else f for f in (risk_record.flags or [])]
+        return RiskResponse(
+            application_id=app_id,
+            score=risk_record.score,
+            level=risk_record.level,
+            flags=flags_data,
+            recommendation=risk_record.recommendation or "NEEDS_HUMAN_REVIEW",
+            summary=risk_record.summary or "",
+        )
+
+    return await assess_risk(app_id, db)
+
