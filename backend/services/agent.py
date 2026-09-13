@@ -204,10 +204,15 @@ async def run_agent(application_id: str, question: str, db: AsyncSession) -> Age
                 evidence_list = []
                 for ev in parsed.get("evidence", []):
                     if isinstance(ev, dict):
+                        pg = ev.get("page")
+                        try:
+                            pg_num = int(pg) if pg is not None else 1
+                        except (ValueError, TypeError):
+                            pg_num = 1
                         evidence_list.append(EvidenceItem(
-                            document=str(ev.get("document", "Document")),
-                            page=int(ev.get("page", 1)),
-                            value=str(ev.get("value", ""))
+                            document=str(ev.get("document") or "Document"),
+                            page=pg_num,
+                            value=str(ev.get("value") or "")
                         ))
                     elif isinstance(ev, str):
                         evidence_list.append(EvidenceItem(document=ev, page=1, value=ev))

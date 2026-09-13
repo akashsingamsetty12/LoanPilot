@@ -420,6 +420,8 @@ class BedrockLLMClient(BaseLLMClient):
         settings = get_settings()
         kwargs = {"region_name": self.region_name or settings.BEDROCK_REGION}
         if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+            if "PASTE_" in settings.AWS_ACCESS_KEY_ID or "PASTE_" in settings.AWS_SECRET_ACCESS_KEY:
+                raise RuntimeError("AWS Bedrock credentials are still placeholders. Please edit backend/.env with your real AWS Access Key ID and Secret Access Key.")
             kwargs["aws_access_key_id"] = settings.AWS_ACCESS_KEY_ID
             kwargs["aws_secret_access_key"] = settings.AWS_SECRET_ACCESS_KEY
 
@@ -450,14 +452,25 @@ class BedrockLLMClient(BaseLLMClient):
                             })
                     converse_messages.append({"role": role, "content": converse_content})
             elif role == "tool":
+                converse_content = []
+                if isinstance(content, list):
+                    for item in content:
+                        t_id = item.get("tool_use_id") or item.get("id") or "call_0"
+                        c_val = item.get("content")
+                        if isinstance(c_val, dict):
+                            converse_content.append({"toolResult": {"toolUseId": t_id, "content": [{"json": c_val}]}})
+                        else:
+                            converse_content.append({"toolResult": {"toolUseId": t_id, "content": [{"text": str(c_val)}]}})
+                elif isinstance(content, dict):
+                    t_id = msg.get("tool_use_id") or msg.get("id") or "call_0"
+                    converse_content.append({"toolResult": {"toolUseId": t_id, "content": [{"json": content}]}})
+                else:
+                    t_id = msg.get("tool_use_id") or msg.get("id") or "call_0"
+                    converse_content.append({"toolResult": {"toolUseId": t_id, "content": [{"text": str(content)}]}})
+
                 converse_messages.append({
                     "role": "user",
-                    "content": [{
-                        "toolResult": {
-                            "toolUseId": msg.get("tool_use_id"),
-                            "content": [{"json": msg.get("content")}] if isinstance(msg.get("content"), dict) else [{"text": str(msg.get("content"))}]
-                        }
-                    }]
+                    "content": converse_content
                 })
 
         tool_specs = []
@@ -583,11 +596,23 @@ class OpenAILLMClient(BaseLLMClient):
             if role in ("user", "assistant"):
                 formatted_messages.append({"role": role, "content": str(m.get("content", ""))})
             elif role == "tool":
-                formatted_messages.append({
-                    "role": "tool",
-                    "tool_call_id": m.get("tool_use_id"),
-                    "content": json.dumps(m.get("content")) if isinstance(m.get("content"), dict) else str(m.get("content"))
-                })
+                content = m.get("content")
+                if isinstance(content, list):
+                    for item in content:
+                        t_id = item.get("tool_use_id") or item.get("id") or "call_0"
+                        c_val = item.get("content")
+                        formatted_messages.append({
+                            "role": "tool",
+                            "tool_call_id": t_id,
+                            "content": json.dumps(c_val) if isinstance(c_val, dict) else str(c_val)
+                        })
+                else:
+                    t_id = m.get("tool_use_id") or m.get("id") or "call_0"
+                    formatted_messages.append({
+                        "role": "tool",
+                        "tool_call_id": t_id,
+                        "content": json.dumps(content) if isinstance(content, dict) else str(content)
+                    })
 
         formatted_tools = []
         for t in tools:
@@ -674,8 +699,11 @@ class ResilientLLMClient:
                 )
                 return await bedrock_client.chat(messages, tools, system_prompt)
             except RuntimeError as e:
-                # Configuration error — raise immediately, do not silently fallback
-                raise
+                if self.settings.ENABLE_LOCAL_FALLBACK:
+                    logger.warning(f"Bedrock configuration error: {str(e)}. Falling back to local emergency mode.")
+                    errors.append(f"Bedrock config: {str(e)}")
+                else:
+                    raise
             except Exception as e:
                 logger.warning(f"Bedrock runtime failure: {str(e)}. Checking fallbacks.")
                 errors.append(f"Bedrock: {str(e)}")
