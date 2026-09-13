@@ -1,72 +1,83 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{js,ts,jsx,tsx}",
-  ],
+  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
       colors: {
         primary: {
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          200: '#BFDBFE',
-          300: '#93C5FD',
-          400: '#60A5FA',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
-          800: '#1E40AF',
-          900: '#1E3A8A',
+          50: '#F0FFD6',
+          100: '#DFFFAA',
+          200: '#C8FF6B',
+          300: '#AAFF00',
+          400: '#96E800',
+          500: '#7FCC00',
+          600: '#6BAF00',
+          700: '#558C00',
+          800: '#3E6600',
+          900: '#264000',
         },
+
         surface: {
-          50: '#FFFFFF',
-          100: '#F8F9FA',
-          200: '#F1F3F5',
-          300: '#E5E7EB',
+          50: '#0A0A0A',
+          100: '#111111',
+          200: '#1A1A1A',
+          300: '#252525',
+          400: '#333333',
+          500: '#444444',
         },
+
         charcoal: {
-          DEFAULT: '#1A1D21',
-          secondary: '#495057',
-          muted: '#868E96',
+          DEFAULT: '#F0F0F0',
+          secondary: '#A0A0A0',
+          muted: '#666666',
         },
+
         risk: {
-          high: '#DC2626',
-          'high-bg': '#FEF2F2',
-          'high-border': '#FECACA',
-          medium: '#D97706',
-          'medium-bg': '#FFFBEB',
-          'medium-border': '#FDE68A',
-          low: '#16A34A',
-          'low-bg': '#F0FDF4',
-          'low-border': '#BBF7D0',
-          pass: '#6B7280',
-          'pass-bg': '#F9FAFB',
-          'pass-border': '#E5E7EB',
+          high: '#FF453A',
+          'high-bg': '#2A1010',
+          'high-border': '#5C1A1A',
+
+          medium: '#FFB340',
+          'medium-bg': '#2A210F',
+          'medium-border': '#5C4518',
+
+          low: '#30D158',
+          'low-bg': '#102A18',
+          'low-border': '#1E5C32',
+
+          pass: '#A1A1AA',
+          'pass-bg': '#181818',
+          'pass-border': '#303030',
         },
-      },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-      },
-      fontSize: {
-        'xs': ['0.75rem', { lineHeight: '1rem' }],
-        'sm': ['0.8125rem', { lineHeight: '1.25rem' }],
-        'base': ['0.875rem', { lineHeight: '1.5rem' }],
-        'lg': ['1rem', { lineHeight: '1.5rem' }],
-        'xl': ['1.125rem', { lineHeight: '1.75rem' }],
-        '2xl': ['1.25rem', { lineHeight: '1.75rem' }],
-        '3xl': ['1.5rem', { lineHeight: '2rem' }],
       },
       boxShadow: {
-        'card': '0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03)',
-        'card-hover': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03)',
-        'dropdown': '0 4px 12px rgba(0, 0, 0, 0.08)',
+        card: '0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.6)',
+        'card-hover': '0 4px 12px rgba(0,0,0,0.6)',
+        glow: '0 0 20px rgba(170,255,0,0.15)',
+        'glow-strong': '0 0 30px rgba(170,255,0,0.25)',
       },
-      borderRadius: {
-        'sm': '0.25rem',
-        'DEFAULT': '0.375rem',
-        'md': '0.5rem',
-        'lg': '0.625rem',
+      animation: {
+        'fade-in': 'fadeIn 0.2s ease-out',
+        'slide-in': 'slideIn 0.3s ease-out',
+        shimmer: 'shimmer 2s infinite linear',
+      },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(4px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        slideIn: {
+          '0%': { opacity: '0', transform: 'translateX(-8px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
+        },
       },
     },
   },

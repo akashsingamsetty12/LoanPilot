@@ -86,8 +86,11 @@ export function NewApplication() {
 
         {/* Step 1: Applicant Details */}
         <Card className="p-6">
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-surface-200">
-            <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-sm">
+          <div className="flex items-center gap-3 mb-6 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+              style={{ background: 'rgba(170,255,0,0.12)', color: '#AAFF00', border: '1px solid rgba(170,255,0,0.2)' }}
+            >
               1
             </div>
             <div>
@@ -181,8 +184,11 @@ export function NewApplication() {
 
         {/* Step 2: Document Upload */}
         <Card className={`p-6 ${!createdAppId ? 'opacity-50 pointer-events-none' : ''}`}>
-          <div className="flex items-center gap-3 mb-6 pb-4 border-b border-surface-200">
-            <div className="w-8 h-8 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center font-bold text-sm">
+          <div className="flex items-center gap-3 mb-6 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+              style={{ background: 'rgba(170,255,0,0.12)', color: '#AAFF00', border: '1px solid rgba(170,255,0,0.2)' }}
+            >
               2
             </div>
             <div>

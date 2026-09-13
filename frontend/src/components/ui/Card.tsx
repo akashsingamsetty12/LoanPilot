@@ -6,9 +6,10 @@ interface CardProps {
   className?: string;
   padding?: 'none' | 'sm' | 'md' | 'lg';
   hover?: boolean;
+  glow?: boolean;
 }
 
-export function Card({ children, className, padding = 'md', hover = false }: CardProps) {
+export function Card({ children, className, padding = 'md', hover = false, glow = false }: CardProps) {
   const paddings = {
     none: '',
     sm: 'p-4',
@@ -19,11 +20,19 @@ export function Card({ children, className, padding = 'md', hover = false }: Car
   return (
     <div
       className={classNames(
-        'bg-white border border-surface-300 rounded-lg shadow-card',
-        hover && 'hover:shadow-card-hover transition-shadow duration-200',
+        'rounded-xl transition-all duration-200',
+        hover && 'hover:border-white/10 hover:-translate-y-0.5',
+        glow && 'shadow-glow',
         paddings[padding],
         className
       )}
+      style={{
+        background: '#111111',
+        border: '1px solid rgba(255,255,255,0.06)',
+        boxShadow: glow
+          ? '0 0 20px rgba(170,255,0,0.08)'
+          : '0 1px 3px rgba(0,0,0,0.5)',
+      }}
     >
       {children}
     </div>
@@ -40,8 +49,14 @@ export function CardHeader({ title, subtitle, action }: CardHeaderProps) {
   return (
     <div className="flex items-start justify-between mb-4">
       <div>
-        <h3 className="text-lg font-semibold text-charcoal">{title}</h3>
-        {subtitle && <p className="text-sm text-charcoal-muted mt-0.5">{subtitle}</p>}
+        <h3 className="text-base font-semibold" style={{ color: '#F0F0F0' }}>
+          {title}
+        </h3>
+        {subtitle && (
+          <p className="text-sm mt-0.5" style={{ color: '#555555' }}>
+            {subtitle}
+          </p>
+        )}
       </div>
       {action && <div>{action}</div>}
     </div>
