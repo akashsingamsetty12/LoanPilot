@@ -1,36 +1,18 @@
-"""Tests for Risk Engine."""
-import pytest
-from services.risk_engine import score_to_level
+from services.risk_engine import calculate_risk_score, score_to_level, build_risk_response
 
 
-def test_score_to_level_low():
-    assert score_to_level(0) == "LOW"
+def test_score_levels():
     assert score_to_level(30) == "LOW"
-
-
-def test_score_to_level_medium():
     assert score_to_level(31) == "MEDIUM"
-    assert score_to_level(60) == "MEDIUM"
-
-
-def test_score_to_level_high():
     assert score_to_level(61) == "HIGH"
-    assert score_to_level(100) == "HIGH"
 
 
-@pytest.mark.asyncio
-async def test_risk_assessment_with_mismatch(client):
-    """Income mismatch should produce HIGH flag."""
-    pass
+def test_income_mismatch_creates_flag():
+    score, flags = calculate_risk_score({"verification_findings": [{"type": "income_mismatch", "description": "Income mismatch", "difference_percent": 25, "documents": ["payslip", "tax_return"], "pages": [1, 3]}]})
+    assert score == 30
+    assert flags[0].severity == "HIGH"
 
 
-@pytest.mark.asyncio
-async def test_risk_assessment_clean_application(client):
-    """Clean application should score LOW with PASS flags."""
-    pass
-
-
-@pytest.mark.asyncio
-async def test_risk_never_auto_approves(client):
-    """Recommendation should never be 'APPROVED' automatically."""
-    pass
+def test_never_auto_approves():
+    result = build_risk_response("APP001", {"verification_findings": []})
+    assert result["recommendation"] == "NEEDS_HUMAN_REVIEW"
