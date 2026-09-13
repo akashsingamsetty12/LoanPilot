@@ -6,8 +6,9 @@ All errors return JSON: {"error_code": "...", "detail": "...", "timestamp": "...
 """
 
 from datetime import datetime, timezone
-from fastapi import Request
+from fastapi import Request, HTTPException as FastAPIHTTPException
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 # ── Custom Exceptions ──
@@ -75,12 +76,23 @@ async def loanpilot_exception_handler(request: Request, exc: LoanPilotException)
 
 
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Catch-all handler for unhandled exceptions."""
+    """Catch-all handler for unhandled exceptions, preserving HTTP exceptions."""
+    if isinstance(exc, (FastAPIHTTPException, StarletteHTTPException)):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error_code": "HTTP_ERROR",
+                "detail": exc.detail,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            },
+            headers=getattr(exc, "headers", None),
+        )
+
     return JSONResponse(
         status_code=500,
         content={
             "error_code": "INTERNAL_ERROR",
-            "detail": "An unexpected error occurred",
+            "detail": str(exc) if str(exc) else "An unexpected error occurred",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )

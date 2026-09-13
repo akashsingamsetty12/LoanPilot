@@ -875,7 +875,8 @@ def get_llm_client(provider: Optional[str] = None) -> BaseLLMClient:
 
 
 class LLMClient(BaseLLMClient):
-    """
+    """Backwards-compatible wrapper over get_llm_client() with LLM fallback and agent chat."""
+
     def __init__(self, provider: Optional[str] = None):
         self.provider = provider
         self._impl = get_llm_client(provider)
