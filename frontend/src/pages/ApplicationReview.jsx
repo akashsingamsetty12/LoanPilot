@@ -26,6 +26,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { getApplication } from '../api/applications';
+import ChatPanel from '../components/agent/ChatPanel';
 
 export default function ApplicationReview() {
   const { id } = useParams();
@@ -38,30 +39,40 @@ export default function ApplicationReview() {
   }, [id]);
 
   return (
-    <div>
-      <h1>Application Review: {id}</h1>
-      <p>Application review dashboard</p>
+    <div className="flex gap-4 h-[calc(100vh-100px)] p-4">
+      <div className="flex-1 flex flex-col overflow-auto">
+        <h1 className="text-xl font-bold text-gray-900">Application Review: {id}</h1>
+        <p className="text-sm text-gray-500">Application review dashboard</p>
 
-      {/* Tab navigation */}
-      <nav>
-        {['documents', 'extraction', 'verification', 'risk'].map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)}>
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </button>
-        ))}
-      </nav>
+        {/* Tab navigation */}
+        <nav className="flex gap-2 border-b my-3">
+          {['documents', 'extraction', 'verification', 'risk'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 text-sm font-medium border-b-2 ${
+                activeTab === tab
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </button>
+          ))}
+        </nav>
 
-      {/* Tab content */}
-      <div>
-        {activeTab === 'documents' && <p>TODO: Document cards grid</p>}
-        {activeTab === 'extraction' && <p>TODO: Extracted fields table</p>}
-        {activeTab === 'verification' && <p>TODO: Verification comparison table</p>}
-        {activeTab === 'risk' && <p>TODO: Risk gauge and flag cards</p>}
+        {/* Tab content */}
+        <div className="flex-1 overflow-auto">
+          {activeTab === 'documents' && <p className="text-sm text-gray-500 p-4">Document cards grid</p>}
+          {activeTab === 'extraction' && <p className="text-sm text-gray-500 p-4">Extracted fields table</p>}
+          {activeTab === 'verification' && <p className="text-sm text-gray-500 p-4">Verification comparison table</p>}
+          {activeTab === 'risk' && <p className="text-sm text-gray-500 p-4">Risk gauge and flag cards</p>}
+        </div>
       </div>
 
-      {/* Chat panel — always visible */}
-      <aside>
-        <p>TODO: "Ask LoanPilot" chat panel</p>
+      {/* Chat panel — always visible on right */}
+      <aside className="w-96 h-full flex-shrink-0">
+        <ChatPanel appId={id} />
       </aside>
     </div>
   );
