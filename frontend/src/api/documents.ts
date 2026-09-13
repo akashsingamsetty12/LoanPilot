@@ -23,7 +23,7 @@ export async function uploadDocuments(
 
     const app = mockApplications.find(a => a.application_id === applicationId);
     if (app) {
-      files.forEach((file, i) => {
+      files.forEach((file) => {
         const lower = file.name.toLowerCase();
         let docType: 'payslip' | 'bank_statement' | 'tax_return' | 'kyc_identity' | 'address_proof' = 'kyc_identity';
         if (lower.includes('payslip') || lower.includes('salary')) docType = 'payslip';

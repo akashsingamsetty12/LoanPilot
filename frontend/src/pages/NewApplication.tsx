@@ -59,13 +59,18 @@ export function NewApplication() {
     }
   };
 
+  const [processingPipeline, setProcessingPipeline] = useState(false);
+
   const handleUploadAndProceed = async () => {
     if (files.length > 0 && createdAppId) {
-      await upload();
+      setProcessingPipeline(true);
       try {
+        await upload();
         await apiClient.post(`/applications/${createdAppId}/process`);
       } catch (err) {
         console.warn('Pipeline run notice:', err);
+      } finally {
+        setProcessingPipeline(false);
       }
       // Navigate to review page
       navigate(`/applications/${createdAppId}`);
@@ -222,10 +227,10 @@ export function NewApplication() {
               <Button
                 variant="primary"
                 onClick={handleUploadAndProceed}
-                loading={uploading}
+                loading={uploading || processingPipeline}
                 icon={Check}
               >
-                Proceed to Application Review
+                {processingPipeline ? 'Processing AI Pipeline...' : 'Proceed to Application Review'}
               </Button>
             </div>
           )}

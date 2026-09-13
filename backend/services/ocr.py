@@ -42,9 +42,17 @@ from models.document import Document
 # TESSERACT CONFIGURATION
 # ---------------------------------------------------------
 
-pytesseract.pytesseract.tesseract_cmd = (
-    r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-)
+import shutil
+import sys
+from config import get_settings
+
+settings = get_settings()
+if settings.TESSERACT_CMD and os.path.exists(settings.TESSERACT_CMD):
+    pytesseract.pytesseract.tesseract_cmd = settings.TESSERACT_CMD
+elif shutil.which("tesseract"):
+    pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
+elif sys.platform == "win32" and os.path.exists(r"C:\Program Files\Tesseract-OCR\tesseract.exe"):
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 
 # ---------------------------------------------------------

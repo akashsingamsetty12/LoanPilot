@@ -52,6 +52,9 @@ def _generate_report_html(
         for f in flags if isinstance(f, dict)
     ]) or "<p style='color:#16a34a;'>No risk flags raised. All verification rules passed.</p>"
 
+    loan_amt_str = f"₹{app.loan_amount:,.0f}" if getattr(app, "loan_amount", None) is not None else "N/A"
+    income_str = f"₹{app.income_annum:,.0f}" if getattr(app, "income_annum", None) is not None else "N/A"
+
     return f"""<!DOCTYPE html>
 <html>
 <head>
@@ -87,8 +90,8 @@ def _generate_report_html(
 <h2>1. Applicant Summary</h2>
 <div class="stat-grid">
   <div class="stat-card"><div class="label">Applicant Name</div><div class="value">{html.escape(app.applicant_name or 'N/A')}</div></div>
-  <div class="stat-card"><div class="label">Loan Amount</div><div class="value">₹{app.loan_amount:,.0f}</div></div>
-  <div class="stat-card"><div class="label">Declared Income</div><div class="value">₹{app.income_annum:,.0f}</div></div>
+  <div class="stat-card"><div class="label">Loan Amount</div><div class="value">{loan_amt_str}</div></div>
+  <div class="stat-card"><div class="label">Declared Income</div><div class="value">{income_str}</div></div>
   <div class="stat-card"><div class="label">CIBIL Score</div><div class="value">{app.cibil_score or 'N/A'}</div></div>
 </div>
 
@@ -147,6 +150,39 @@ async def generate_report(app_id: str, db: AsyncSession) -> ReportResponse:
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(report_html)
 
+    # Format verification results for frontend
+    verif_results = []
+    if vr:
+        for m in (vr.matches or []):
+            if isinstance(m, str):
+                verif_results.append({
+                    "field_name": m.replace("_", " ").title(),
+                    "status": "PASS"
+                })
+            elif isinstance(m, dict):
+                verif_results.append({
+                    "field_name": m.get("field", "Field").replace("_", " ").title(),
+                    "status": "PASS"
+                })
+        for m in (vr.mismatches or []):
+            if isinstance(m, dict):
+                verif_results.append({
+                    "field_name": m.get("field", "Field").replace("_", " ").title(),
+                    "status": "MISMATCH"
+                })
+
+    formatted_flags = []
+    if risk and isinstance(risk.flags, list):
+        for idx, f in enumerate(risk.flags):
+            if isinstance(f, dict):
+                formatted_flags.append({
+                    "id": str(idx + 1),
+                    "severity": f.get("severity", "MEDIUM"),
+                    "reason": f.get("reason", ""),
+                    "details": f.get("evidence", "") or f.get("reason", ""),
+                    "evidence": []
+                })
+
     return ReportResponse(
         application_id=app_id,
         report_html=report_html,
@@ -158,7 +194,15 @@ async def generate_report(app_id: str, db: AsyncSession) -> ReportResponse:
             "verification",
             "flags",
             "recommendation",
-        ]
+        ],
+        applicant_name=app.applicant_name or "Applicant",
+        documents_reviewed=len([d for d in docs if d.status in ("completed", "extracted", "verified")]),
+        risk_score=risk.score if risk else (app.risk_score or 0.0),
+        risk_level=risk.level if risk else (app.risk_level or "LOW"),
+        flags=formatted_flags,
+        verification_results=verif_results,
+        missing_documents=vr.missing_documents if vr and isinstance(vr.missing_documents, list) else [],
+        recommendation=risk.recommendation if risk else (app.recommendation or "NEEDS_HUMAN_REVIEW"),
     )
 
 

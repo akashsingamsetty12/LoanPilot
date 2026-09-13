@@ -126,8 +126,8 @@ async def classify_document(
     classifier = DocumentClassifier(llm_client=llm_client)
 
     if ocr_input is None:
-        raw_text = ""
         filename = "unknown"
+        pages = []
         if db is not None:
             try:
                 from models.document import Document
@@ -135,15 +135,31 @@ async def classify_document(
                 result = await db.execute(select(Document).where(Document.id == doc_id))
                 doc = result.scalar_one_or_none()
                 if doc:
-                    raw_text = doc.raw_text or ""
                     filename = doc.filename or "unknown"
+                    if isinstance(doc.raw_text, list):
+                        for p in doc.raw_text:
+                            if isinstance(p, dict):
+                                pages.append(
+                                    OCRPage(
+                                        page=p.get("page", 1),
+                                        text=str(p.get("text", "")),
+                                        ocr_confidence=float(p.get("confidence", 1.0)),
+                                    )
+                                )
+                            elif isinstance(p, str):
+                                pages.append(OCRPage(page=len(pages) + 1, text=p, ocr_confidence=1.0))
+                    elif isinstance(doc.raw_text, str) and doc.raw_text.strip():
+                        pages.append(OCRPage(page=1, text=doc.raw_text, ocr_confidence=1.0))
             except Exception:
                 pass
+
+        if not pages:
+            pages = [OCRPage(page=1, text="", ocr_confidence=1.0)]
 
         ocr_input = OCRDocumentInput(
             document_id=doc_id,
             filename=filename,
-            pages=[OCRPage(page=1, text=raw_text, ocr_confidence=1.0)]
+            pages=pages,
         )
 
     if ocr_input.document_id != doc_id:

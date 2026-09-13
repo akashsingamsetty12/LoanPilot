@@ -40,6 +40,7 @@ async def generate_report_endpoint(
 
 
 @router.get("/{app_id}/report/download")
+@router.get("/{app_id}/report/pdf")
 async def download_report(
     app_id: str,
     db: AsyncSession = Depends(get_db),

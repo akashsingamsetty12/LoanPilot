@@ -4,8 +4,11 @@ Documents Router
 Upload and status tracking endpoints for loan documents.
 """
 
+import os
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from config import get_settings
 
 from database import get_db
 from schemas.document import (
@@ -145,3 +148,44 @@ async def get_document_status_endpoint(
 
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/documents/{doc_id}/file")
+async def get_document_file_endpoint(
+    doc_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Serve the raw document file (PDF or image) for in-browser preview or download."""
+    result = await db.execute(select(Document).where(Document.id == doc_id))
+    document = result.scalar_one_or_none()
+    if document is None:
+        raise HTTPException(status_code=404, detail=f"Document not found: {doc_id}")
+
+    settings = get_settings()
+    target_path = None
+    candidates = [
+        document.file_path,
+        os.path.join(settings.UPLOAD_DIR, document.application_id, document.id, document.filename) if document.application_id and document.filename else None,
+        os.path.join("uploads", document.application_id, document.id, document.filename) if document.application_id and document.filename else None,
+        os.path.join("/app/uploads", document.application_id, document.id, document.filename) if document.application_id and document.filename else None,
+    ]
+    for c in candidates:
+        if c and os.path.exists(c):
+            target_path = c
+            break
+
+    if not target_path:
+        raise HTTPException(status_code=404, detail=f"Document file not found on disk for {doc_id}")
+
+    import mimetypes
+    media_type = document.file_type
+    if not media_type or media_type == "application/octet-stream":
+        guessed, _ = mimetypes.guess_type(target_path)
+        media_type = guessed or "application/octet-stream"
+
+    return FileResponse(
+        path=target_path,
+        media_type=media_type,
+        content_disposition_type="inline",
+        filename=document.filename,
+    )

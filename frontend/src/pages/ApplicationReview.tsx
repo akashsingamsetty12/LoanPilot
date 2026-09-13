@@ -5,7 +5,8 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  Download
+  Download,
+  ExternalLink,
 } from 'lucide-react';
 import { Topbar } from '../components/layout/Topbar';
 import { ApplicationHeader } from '../components/review/ApplicationHeader';
@@ -21,6 +22,8 @@ import { Modal } from '../components/ui/Modal';
 import { Spinner } from '../components/ui/Spinner';
 import { ErrorState } from '../components/ui/ErrorState';
 import { useApplication } from '../hooks/useApplication';
+import { decideApplication } from '../api/applications';
+import type { LoanDocument } from '../types';
 
 export function ApplicationReview() {
   const { id } = useParams<{ id: string }>();
@@ -30,24 +33,58 @@ export function ApplicationReview() {
   // Active section tab for review workspace navigation
   const [activeTab, setActiveTab] = useState<'overview' | 'documents' | 'extraction' | 'comparison' | 'flags'>('overview');
 
+  // Document preview modal state
+  const [viewingDoc, setViewingDoc] = useState<LoanDocument | null>(null);
+
   // Action Modals
   const [modalAction, setModalAction] = useState<'approve' | 'reject' | 'request_info' | null>(null);
   const [actionReason, setActionReason] = useState('');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+  const [submittingDecision, setSubmittingDecision] = useState(false);
 
-  const handleDecisionSubmit = () => {
-    if (!modalAction) return;
-    const actionText =
+  const handleViewDocument = (docId: string) => {
+    const doc = application?.documents?.find((d) => d.document_id === docId);
+    if (doc) {
+      setViewingDoc(doc);
+    } else {
+      const url = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/documents/${docId}/file`;
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleDecisionSubmit = async () => {
+    if (!modalAction || !application) return;
+    const decisionValue =
       modalAction === 'approve'
-        ? 'Application Approved'
+        ? 'approved'
         : modalAction === 'reject'
-        ? 'Application Rejected'
-        : 'Additional Information Requested';
+          ? 'rejected'
+          : 'needs_more_info';
 
-    setActionSuccess(`${actionText} successfully recorded.`);
-    setModalAction(null);
-    setActionReason('');
-    refetch();
+    setSubmittingDecision(true);
+    try {
+      await decideApplication(application.application_id, {
+        decision: decisionValue,
+        notes: actionReason.trim() || undefined,
+        decided_by: 'Loan Officer',
+      });
+
+      const actionText =
+        modalAction === 'approve'
+          ? 'Application Approved'
+          : modalAction === 'reject'
+            ? 'Application Rejected'
+            : 'Additional Information Requested';
+
+      setActionSuccess(`${actionText} successfully recorded.`);
+      setModalAction(null);
+      setActionReason('');
+      await refetch();
+    } catch (err: any) {
+      alert(err.message || 'Failed to submit decision.');
+    } finally {
+      setSubmittingDecision(false);
+    }
   };
 
   if (loading) {
@@ -157,11 +194,10 @@ export function ApplicationReview() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
-                activeTab === tab.id
-                  ? 'border-brand-600 text-brand-600'
-                  : 'border-transparent text-charcoal-muted hover:text-charcoal'
-              }`}
+              className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id
+                ? 'border-brand-600 text-brand-600'
+                : 'border-transparent text-charcoal-muted hover:text-charcoal'
+                }`}
             >
               {tab.label}
             </button>
@@ -189,13 +225,13 @@ export function ApplicationReview() {
             />
 
             {/* Section B: Document List & Confidence */}
-            <DocumentsSection documents={application.documents} />
+            <DocumentsSection documents={application.documents} onViewDocument={handleViewDocument} />
 
             {/* Section C: Extracted Fields & Evidence */}
             <ExtractedFields documents={application.documents} />
           </div>
         ) : activeTab === 'documents' ? (
-          <DocumentsSection documents={application.documents} />
+          <DocumentsSection documents={application.documents} onViewDocument={handleViewDocument} />
         ) : activeTab === 'extraction' ? (
           <ExtractedFields documents={application.documents} />
         ) : activeTab === 'comparison' ? (
@@ -214,13 +250,13 @@ export function ApplicationReview() {
       {/* Action Modal */}
       <Modal
         isOpen={Boolean(modalAction)}
-        onClose={() => setModalAction(null)}
+        onClose={() => !submittingDecision && setModalAction(null)}
         title={
           modalAction === 'approve'
             ? 'Approve Loan Application'
             : modalAction === 'reject'
-            ? 'Reject Loan Application'
-            : 'Request Additional Information'
+              ? 'Reject Loan Application'
+              : 'Request Additional Information'
         }
       >
         <div className="space-y-4">
@@ -228,8 +264,8 @@ export function ApplicationReview() {
             {modalAction === 'approve'
               ? 'Are you sure you want to approve this application? This action will mark the document verification complete.'
               : modalAction === 'reject'
-              ? 'Please provide a clear reason for rejecting this application for audit compliance.'
-              : 'Specify what additional documents or info are required from the borrower.'}
+                ? 'Please provide a clear reason for rejecting this application for audit compliance.'
+                : 'Specify what additional documents or info are required from the borrower.'}
           </p>
 
           <div>
@@ -242,22 +278,116 @@ export function ApplicationReview() {
               onChange={(e) => setActionReason(e.target.value)}
               placeholder="Enter notes for audit trail..."
               className="input-field w-full text-sm"
+              disabled={submittingDecision}
             />
           </div>
 
           <div className="flex justify-end gap-3 pt-2 border-t border-surface-200">
-            <Button variant="outline" size="sm" onClick={() => setModalAction(null)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setModalAction(null)}
+              disabled={submittingDecision}
+            >
               Cancel
             </Button>
             <Button
               variant={modalAction === 'reject' ? 'danger' : 'primary'}
               size="sm"
               onClick={handleDecisionSubmit}
+              loading={submittingDecision}
             >
               Confirm Decision
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* Document Preview Modal */}
+      <Modal
+        isOpen={Boolean(viewingDoc)}
+        onClose={() => setViewingDoc(null)}
+        title={viewingDoc ? `Document Preview — ${viewingDoc.file_name}` : 'Document Preview'}
+        size="xl"
+      >
+        {viewingDoc && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-surface-50 rounded-lg border border-surface-200 text-xs">
+              <div className="flex items-center gap-4">
+                <div>
+                  <span className="text-charcoal-muted">Type: </span>
+                  <span className="font-semibold text-charcoal capitalize">
+                    {viewingDoc.type ? viewingDoc.type.replace(/_/g, ' ') : 'Unknown'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-charcoal-muted">Pages: </span>
+                  <span className="font-semibold text-charcoal">{viewingDoc.pages || 1}</span>
+                </div>
+                <div>
+                  <span className="text-charcoal-muted">OCR Confidence: </span>
+                  <span className="font-semibold text-charcoal">{viewingDoc.ocr_confidence}%</span>
+                </div>
+              </div>
+              <a
+                href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/documents/${viewingDoc.document_id}/file`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Open Raw File in New Tab
+              </a>
+            </div>
+
+            {/* In-Browser Document Viewer */}
+            <div className="h-96 w-full bg-surface-100 rounded-lg border border-surface-200 overflow-hidden flex items-center justify-center p-2">
+              {viewingDoc.file_name.match(/\.(jpeg|jpg|png|webp|gif)$/i) ? (
+                <img
+                  src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/documents/${viewingDoc.document_id}/file`}
+                  alt={viewingDoc.file_name}
+                  className="max-h-full max-w-full object-contain rounded"
+                />
+              ) : (
+                <iframe
+                  src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/documents/${viewingDoc.document_id}/file`}
+                  title={viewingDoc.file_name}
+                  className="w-full h-full border-0 rounded"
+                />
+              )}
+            </div>
+
+            {/* Extracted Fields Table */}
+            <div>
+              <h4 className="text-xs font-semibold text-charcoal uppercase tracking-wider mb-2">
+                Extracted Fields ({viewingDoc.fields?.length || 0})
+              </h4>
+              {viewingDoc.fields && viewingDoc.fields.length > 0 ? (
+                <div className="max-h-48 overflow-y-auto border border-surface-200 rounded-lg divide-y divide-surface-200 bg-white">
+                  {viewingDoc.fields.map((f, idx) => (
+                    <div key={idx} className="p-2.5 flex items-center justify-between text-xs">
+                      <span className="text-charcoal-muted font-medium">{f.field_name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-charcoal">{f.value}</span>
+                        <span className="text-[10px] text-charcoal-muted">({f.confidence}%)</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-charcoal-muted italic p-3 bg-surface-50 rounded border border-surface-200">
+                  No structured fields extracted from this document yet.
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-surface-200">
+              <Button variant="outline" size="sm" onClick={() => setViewingDoc(null)}>
+                Close Preview
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

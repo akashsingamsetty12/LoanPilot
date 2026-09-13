@@ -33,13 +33,13 @@ function normalizeApplication(data: any): Application {
   // Format verification
   const ver = data.verification || {};
   const matches = (ver.matches || []).map((m: any) => typeof m === 'string' ? {
-    field_name: m.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    field_name: m.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
     values: [{ document: 'Verified', value: 'Consistent' }],
     status: 'PASS' as const
   } : m);
 
   const mismatches = (ver.mismatches || []).map((m: any) => typeof m === 'object' && m.field ? {
-    field_name: m.field.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+    field_name: m.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
     values: [
       { document: m.sources?.[0] || 'Source A', value: String(m.values?.[0] ?? '') },
       { document: m.sources?.[1] || 'Source B', value: String(m.values?.[1] ?? '') }
@@ -129,6 +129,18 @@ export async function createApplication(data: {
   return normalizeApplication(response.data);
 }
 
+export async function decideApplication(
+  id: string,
+  data: {
+    decision: 'approved' | 'rejected' | 'needs_more_info';
+    notes?: string;
+    decided_by?: string;
+  }
+): Promise<any> {
+  const response = await apiClient.patch(`/applications/${id}/decide`, data);
+  return response.data;
+}
+
 export async function getDashboardStats(): Promise<DashboardStats> {
   if (useMock) {
     await delay(400);
@@ -144,12 +156,10 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     const completed = apps.filter(a => a.status === 'completed').length;
     const highRisk = apps.filter(a => a.risk?.level === 'HIGH').length;
     return {
-      total_applications: total,
-      pending_review: review,
-      auto_verified: completed,
-      high_risk_flagged: highRisk,
-      avg_processing_time: '2.4m',
-      system_accuracy: '98.6%',
+      total,
+      pending: review,
+      needs_attention: highRisk,
+      completed,
     };
   }
 }

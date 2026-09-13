@@ -58,7 +58,7 @@ class ReportResponse(BaseModel):
     """Generated loan verification report."""
     application_id: str
     report_html: str
-    report_url: Optional[str] = None     # URL to download PDF
+    report_url: Optional[str] = None     # URL to download report
     generated_at: datetime
     sections: list[str] = [
         "applicant_info",
@@ -67,3 +67,12 @@ class ReportResponse(BaseModel):
         "flags",
         "recommendation",
     ]
+    # Compatibility fields for frontend VerificationReport
+    applicant_name: Optional[str] = None
+    documents_reviewed: int = 0
+    risk_score: float = 0.0
+    risk_level: str = "LOW"
+    flags: list[Any] = []
+    verification_results: list[Any] = []
+    missing_documents: list[str] = []
+    recommendation: str = "NEEDS_HUMAN_REVIEW"

@@ -12,6 +12,7 @@ export type DocumentType =
   | 'bank_statement'
   | 'tax_return'
   | 'id_proof'
+  | 'kyc_identity'
   | 'address_proof'
   | 'employment_letter'
   | 'other';

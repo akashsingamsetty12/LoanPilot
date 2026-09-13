@@ -28,8 +28,13 @@ async def create_application(
     db: AsyncSession,
 ) -> ApplicationSummary:
     """Create a new loan application."""
+    # Collision-safe application ID generation
+    app_id = generate_application_id()
+    while (await db.execute(select(Application.id).where(Application.id == app_id))).scalar_one_or_none():
+        app_id = generate_application_id()
+
     application = Application(
-        id=generate_application_id(),
+        id=app_id,
         applicant_name=request.applicant_name,
         kaggle_loan_id=request.kaggle_loan_id,
         status="created",
@@ -81,6 +86,8 @@ async def upload_document(
 
     # Generate document ID
     doc_id = generate_document_id()
+    while (await db.execute(select(Document.id).where(Document.id == doc_id))).scalar_one_or_none():
+        doc_id = generate_document_id()
 
     # Generate upload path
     upload_path = get_upload_path(
