@@ -43,6 +43,9 @@ class DocumentExtractor:
         raw_doc_type = document_type.value if isinstance(document_type, DocumentType) else str(document_type)
         norm_doc_type = normalize_document_type(raw_doc_type)
 
+        from config import get_settings
+        settings = get_settings()
+
         # Handle 'other' document type: no specific extractions required
         if norm_doc_type == DocumentType.OTHER.value or norm_doc_type not in EXTRACTION_SYSTEM_PROMPTS:
             return ExtractionResult(
@@ -51,7 +54,13 @@ class DocumentExtractor:
                 type=DocumentType(norm_doc_type),
                 filename=ocr_input.filename,
                 ocr_confidence=ocr_input.ocr_confidence,
-                fields={}
+                fields={},
+                confidence=1.0,
+                provider_used=getattr(self.llm_client, "provider_name", "mock"),
+                fallback_used=False,
+                attempt_count=0,
+                needs_review=False,
+                error=None
             )
 
         system_instruction = EXTRACTION_SYSTEM_PROMPTS[norm_doc_type]
@@ -68,16 +77,63 @@ class DocumentExtractor:
             ocr_text=ocr_text_combined
         )
 
-        try:
-            raw_response = self.llm_client.generate_json(
+        if hasattr(self.llm_client, "generate_with_fallback"):
+            fallback_res = self.llm_client.generate_with_fallback(
                 prompt=user_prompt,
                 system_instruction=system_instruction
             )
-            processed_fields = process_fields_confidence(raw_response)
+        else:
+            try:
+                raw = self.llm_client.generate_json(
+                    prompt=user_prompt,
+                    system_instruction=system_instruction
+                )
+                from utils.llm_client import LLMFallbackResult
+                fallback_res = LLMFallbackResult(
+                    data=raw,
+                    provider_used=getattr(self.llm_client, "provider_name", "mock"),
+                    fallback_used=False,
+                    attempt_count=1,
+                    needs_review=False,
+                    error=None
+                )
+            except Exception as err:
+                from utils.llm_client import LLMFallbackResult
+                fallback_res = LLMFallbackResult(
+                    data={},
+                    provider_used=None,
+                    fallback_used=True,
+                    attempt_count=1,
+                    needs_review=True,
+                    error=str(err)
+                )
 
-        except Exception as err:
-            print(f"[Warning] Extraction LLM call failed: {err}")
-            processed_fields = {}
+        if fallback_res.provider_used is None or fallback_res.error:
+            return ExtractionResult(
+                document_id=ocr_input.document_id,
+                document_type=DocumentType(norm_doc_type),
+                type=DocumentType(norm_doc_type),
+                filename=ocr_input.filename,
+                ocr_confidence=ocr_input.ocr_confidence,
+                fields={},
+                confidence=0.0,
+                provider_used=None,
+                fallback_used=True,
+                attempt_count=fallback_res.attempt_count,
+                needs_review=True,
+                error=fallback_res.error or "Information extraction failed"
+            )
+
+        processed_fields = process_fields_confidence(fallback_res.data)
+
+        # Calculate overall confidence & needs_review
+        if processed_fields:
+            avg_confidence = round(sum(f.confidence for f in processed_fields.values()) / len(processed_fields), 4)
+            any_field_needs_review = any(f.needs_review for f in processed_fields.values())
+            overall_needs_review = any_field_needs_review or (avg_confidence < settings.CONFIDENCE_THRESHOLD)
+        else:
+            avg_confidence = 0.0
+            overall_needs_review = True
 
         return ExtractionResult(
             document_id=ocr_input.document_id,
@@ -85,8 +141,15 @@ class DocumentExtractor:
             type=DocumentType(norm_doc_type),
             filename=ocr_input.filename,
             ocr_confidence=ocr_input.ocr_confidence,
-            fields=processed_fields
+            fields=processed_fields,
+            confidence=avg_confidence,
+            provider_used=fallback_res.provider_used,
+            fallback_used=fallback_res.fallback_used,
+            attempt_count=fallback_res.attempt_count,
+            needs_review=overall_needs_review,
+            error=None
         )
+
 
 
 async def extract_fields(

@@ -7,9 +7,19 @@ Google Gemini, and Mock provider for offline execution and testing.
 
 import json
 import re
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, NamedTuple, List, Tuple
 from config import get_settings
 from utils.confidence import parse_numeric_value
+
+
+class LLMFallbackResult(NamedTuple):
+    data: Dict[str, Any]
+    provider_used: Optional[str]
+    fallback_used: bool
+    attempt_count: int
+    needs_review: bool
+    error: Optional[str]
+
 
 
 def clean_and_parse_json(text_or_content: str) -> Dict[str, Any]:
@@ -94,9 +104,18 @@ def normalize_ocr_label(text: str) -> str:
 
 class BaseLLMClient:
     """Base abstract interface for LLM client providers."""
+    provider_name: str = "base"
 
     def generate_json(self, prompt: str, system_instruction: str) -> Dict[str, Any]:
         raise NotImplementedError("LLM client must implement generate_json")
+
+    def generate_with_fallback(
+        self,
+        prompt: str,
+        system_instruction: str,
+        primary_provider: Optional[str] = None
+    ) -> LLMFallbackResult:
+        return generate_with_fallback(prompt, system_instruction, primary_provider=primary_provider or self.provider_name)
 
 
 class MockLLMClient(BaseLLMClient):
@@ -105,6 +124,7 @@ class MockLLMClient(BaseLLMClient):
     without requiring external API keys. Uses deterministic rules to extract
     structured JSON from OCR text.
     """
+    provider_name: str = "mock"
 
     def generate_json(self, prompt: str, system_instruction: str) -> Dict[str, Any]:
         system_lower = system_instruction.lower()
@@ -308,6 +328,7 @@ class MockLLMClient(BaseLLMClient):
 
 class GeminiLLMClient(BaseLLMClient):
     """Google Gemini LLM Client wrapper."""
+    provider_name: str = "gemini"
 
     def __init__(self, api_key: str, model_name: str = "gemini-2.5-flash"):
         self.api_key = api_key
@@ -335,6 +356,7 @@ class GeminiLLMClient(BaseLLMClient):
 
 class OpenAILLMClient(BaseLLMClient):
     """OpenAI LLM Client wrapper."""
+    provider_name: str = "openai"
 
     def __init__(self, api_key: str, model_name: str = "gpt-4o-mini"):
         self.api_key = api_key
@@ -359,6 +381,97 @@ class OpenAILLMClient(BaseLLMClient):
             raise RuntimeError(f"OpenAI API execution error: {str(e)}")
 
 
+def generate_with_fallback(
+    prompt: str,
+    system_instruction: str,
+    primary_provider: Optional[str] = None,
+    max_retries_per_provider: int = 2,
+) -> LLMFallbackResult:
+    """
+    Central fallback function for LLM generation.
+    Tries primary provider, retries on temporary failures, falls back to secondary provider,
+    falls back to Mock, and finally returns controlled failure if all fail.
+    """
+    settings = get_settings()
+    configured_provider = (primary_provider or settings.LLM_PROVIDER or "openai").lower().strip()
+
+    if configured_provider == "gemini":
+        provider_chain = ["gemini", "openai", "mock"]
+    elif configured_provider == "openai":
+        provider_chain = ["openai", "gemini", "mock"]
+    elif configured_provider == "mock":
+        provider_chain = ["mock"]
+    else:
+        provider_chain = ["openai", "gemini", "mock"]
+
+    primary_name = provider_chain[0]
+    total_attempts = 0
+    primary_failed_or_skipped = False
+
+    for provider in provider_chain:
+        is_primary = (provider == primary_name)
+
+        if provider == "openai":
+            if not settings.OPENAI_API_KEY:
+                print("OpenAI skipped: API key not configured")
+                if is_primary:
+                    primary_failed_or_skipped = True
+                continue
+            client = OpenAILLMClient(api_key=settings.OPENAI_API_KEY, model_name=settings.OPENAI_MODEL)
+
+        elif provider == "gemini":
+            if not settings.GEMINI_API_KEY:
+                print("Gemini skipped: API key not configured")
+                if is_primary:
+                    primary_failed_or_skipped = True
+                continue
+            client = GeminiLLMClient(api_key=settings.GEMINI_API_KEY, model_name=settings.GEMINI_MODEL)
+
+        elif provider == "mock":
+            if not is_primary:
+                print("Using Mock provider")
+            client = MockLLMClient()
+        else:
+            continue
+
+        for attempt in range(1, max_retries_per_provider + 1):
+            total_attempts += 1
+
+            if is_primary and attempt == 1:
+                print(f"Trying primary provider: {provider}")
+            elif attempt > 1:
+                print(f"Retrying {provider}: attempt {attempt}")
+            elif not is_primary and provider != "mock":
+                print(f"Switching fallback provider: {provider}")
+
+            try:
+                data = client.generate_json(prompt, system_instruction)
+                fallback_used = (provider != primary_name) or primary_failed_or_skipped or (attempt > 1)
+                return LLMFallbackResult(
+                    data=data,
+                    provider_used=provider,
+                    fallback_used=fallback_used,
+                    attempt_count=total_attempts,
+                    needs_review=False,
+                    error=None
+                )
+            except Exception as err:
+                provider_display = "OpenAI" if provider == "openai" else ("Gemini" if provider == "gemini" else "Mock")
+                print(f"{provider_display} request failed")
+                if is_primary:
+                    primary_failed_or_skipped = True
+
+    print("All providers failed")
+    return LLMFallbackResult(
+        data={},
+        provider_used=None,
+        fallback_used=True,
+        attempt_count=total_attempts,
+        needs_review=True,
+        error="All LLM providers failed. Manual review required."
+    )
+
+
 def get_llm_client(provider: Optional[str] = None) -> BaseLLMClient:
     """Factory to instantiate LLM client based on environment config or request argument."""
     settings = get_settings()
@@ -368,28 +481,46 @@ def get_llm_client(provider: Optional[str] = None) -> BaseLLMClient:
         if settings.GEMINI_API_KEY:
             return GeminiLLMClient(api_key=settings.GEMINI_API_KEY, model_name=settings.GEMINI_MODEL)
         else:
-            print("[Warning] GEMINI_API_KEY not found. Falling back to MockLLMClient.")
+            print("Gemini skipped: API key not configured")
             return MockLLMClient()
     elif selected_provider == "openai":
         if settings.OPENAI_API_KEY:
             return OpenAILLMClient(api_key=settings.OPENAI_API_KEY, model_name=settings.OPENAI_MODEL)
         else:
-            print("[Warning] OPENAI_API_KEY not found. Falling back to MockLLMClient.")
+            print("OpenAI skipped: API key not configured")
             return MockLLMClient()
     else:
         return MockLLMClient()
 
 
-class LLMClient:
+class LLMClient(BaseLLMClient):
     """
-    Backwards-compatible wrapper over get_llm_client().
+    Backwards-compatible wrapper over get_llm_client() with LLM fallback support.
     """
 
-    def __init__(self):
-        self._impl = get_llm_client()
+    def __init__(self, provider: Optional[str] = None):
+        self.provider = provider
+
+    @property
+    def provider_name(self) -> str:
+        settings = get_settings()
+        return self.provider or settings.LLM_PROVIDER
 
     def generate_json(self, prompt: str, system_instruction: str) -> Dict[str, Any]:
-        return self._impl.generate_json(prompt, system_instruction)
+        res = self.generate_with_fallback(prompt, system_instruction)
+        if res.provider_used is None:
+            raise RuntimeError(res.error or "All LLM providers failed")
+        return res.data
+
+    def generate_with_fallback(
+        self,
+        prompt: str,
+        system_instruction: str,
+        primary_provider: Optional[str] = None
+    ) -> LLMFallbackResult:
+        prov = primary_provider or self.provider
+        return generate_with_fallback(prompt, system_instruction, primary_provider=prov)
 
 
 llm_client = LLMClient()
+

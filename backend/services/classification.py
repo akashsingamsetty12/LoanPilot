@@ -32,7 +32,7 @@ class DocumentClassifier:
     def classify(self, ocr_input: OCRDocumentInput) -> ClassificationResult:
         """
         Classifies OCR text into document category.
-        If evidence is insufficient, defaults to DocumentType.OTHER.
+        If evidence is insufficient or LLM providers fail, defaults to DocumentType.OTHER.
         """
         ocr_text_combined = "\n\n".join([
             f"--- Page {p.page} ---\n{p.text}" for p in ocr_input.pages
@@ -44,31 +44,73 @@ class DocumentClassifier:
             ocr_text=ocr_text_combined
         )
 
-        try:
-            raw_response = self.llm_client.generate_json(
+        from config import get_settings
+        settings = get_settings()
+
+        if hasattr(self.llm_client, "generate_with_fallback"):
+            fallback_res = self.llm_client.generate_with_fallback(
                 prompt=user_prompt,
                 system_instruction=CLASSIFICATION_SYSTEM_PROMPT
             )
+        else:
+            try:
+                raw = self.llm_client.generate_json(
+                    prompt=user_prompt,
+                    system_instruction=CLASSIFICATION_SYSTEM_PROMPT
+                )
+                from utils.llm_client import LLMFallbackResult
+                fallback_res = LLMFallbackResult(
+                    data=raw,
+                    provider_used=getattr(self.llm_client, "provider_name", "mock"),
+                    fallback_used=False,
+                    attempt_count=1,
+                    needs_review=False,
+                    error=None
+                )
+            except Exception as err:
+                from utils.llm_client import LLMFallbackResult
+                fallback_res = LLMFallbackResult(
+                    data={},
+                    provider_used=None,
+                    fallback_used=True,
+                    attempt_count=1,
+                    needs_review=True,
+                    error=str(err)
+                )
 
-            raw_doc_type = str(raw_response.get("document_type", "other")).strip()
-            norm_doc_type = normalize_document_type(raw_doc_type)
-            confidence = float(raw_response.get("confidence", 0.0))
-            reason = str(raw_response.get("reason", "No detailed rationale provided."))
-
-            return ClassificationResult(
-                document_id=ocr_input.document_id,
-                document_type=DocumentType(norm_doc_type),
-                confidence=round(confidence, 4),
-                reason=reason
-            )
-
-        except Exception as err:
+        if fallback_res.provider_used is None or fallback_res.error:
             return ClassificationResult(
                 document_id=ocr_input.document_id,
                 document_type=DocumentType.OTHER,
                 confidence=0.0,
-                reason=f"Classification failed with error: {str(err)}. Defaulted to 'other'."
+                reason=fallback_res.error or "Document classification failed",
+                provider_used=None,
+                fallback_used=True,
+                attempt_count=fallback_res.attempt_count,
+                needs_review=True,
+                error=fallback_res.error or "Document classification failed"
             )
+
+        raw_response = fallback_res.data
+        raw_doc_type = str(raw_response.get("document_type", "other")).strip()
+        norm_doc_type = normalize_document_type(raw_doc_type)
+        confidence = float(raw_response.get("confidence", 0.0))
+        reason = str(raw_response.get("reason", "No detailed rationale provided."))
+
+        needs_review = (confidence < settings.CONFIDENCE_THRESHOLD)
+
+        return ClassificationResult(
+            document_id=ocr_input.document_id,
+            document_type=DocumentType(norm_doc_type),
+            confidence=round(confidence, 4),
+            reason=reason,
+            provider_used=fallback_res.provider_used,
+            fallback_used=fallback_res.fallback_used,
+            attempt_count=fallback_res.attempt_count,
+            needs_review=needs_review,
+            error=None
+        )
+
 
 
 async def classify_document(
