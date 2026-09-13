@@ -66,6 +66,11 @@ class ClassificationResult(BaseModel):
     reason: str = Field(default="", description="LLM rationale for the assigned classification")
     doc_type: Optional[str] = Field(default=None, description="Alias for document_type for API compatibility")
     reasoning: Optional[str] = Field(default=None, description="Alias for reason for API compatibility")
+    provider_used: Optional[str] = Field(default=None, description="LLM provider that generated response")
+    fallback_used: bool = Field(default=False, description="True if fallback provider was used")
+    attempt_count: int = Field(default=0, description="Total provider attempts")
+    needs_review: bool = Field(default=False, description="True if low confidence, unsafe, or failed")
+    error: Optional[str] = Field(default=None, description="Error details if classification failed")
 
     @model_validator(mode="after")
     def sync_aliases(self) -> "ClassificationResult":
@@ -127,6 +132,12 @@ class ExtractionResult(BaseModel):
     filename: Optional[str] = None
     ocr_confidence: Optional[float] = None
     fields: Dict[str, ExtractedField] = Field(default_factory=dict)
+    confidence: Optional[float] = Field(default=None, description="Overall extraction confidence score")
+    provider_used: Optional[str] = Field(default=None, description="LLM provider that generated response")
+    fallback_used: bool = Field(default=False, description="True if fallback provider was used")
+    attempt_count: int = Field(default=0, description="Total provider attempts")
+    needs_review: bool = Field(default=False, description="True if low confidence, unsafe, or failed")
+    error: Optional[str] = Field(default=None, description="Error details if extraction failed")
 
     @model_validator(mode="after")
     def sync_aliases(self) -> "ExtractionResult":
@@ -136,3 +147,4 @@ class ExtractionResult(BaseModel):
         if self.doc_type is None:
             self.doc_type = dt_val
         return self
+
