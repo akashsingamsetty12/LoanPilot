@@ -6,6 +6,7 @@ import { DocumentUpload } from '../components/documents/DocumentUpload';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { createApplication } from '../api/applications';
+import apiClient from '../api/client';
 import { useUpload } from '../hooks/useUpload';
 import type { LoanType } from '../types';
 
@@ -61,6 +62,11 @@ export function NewApplication() {
   const handleUploadAndProceed = async () => {
     if (files.length > 0 && createdAppId) {
       await upload();
+      try {
+        await apiClient.post(`/applications/${createdAppId}/process`);
+      } catch (err) {
+        console.warn('Pipeline run notice:', err);
+      }
       // Navigate to review page
       navigate(`/applications/${createdAppId}`);
     } else if (createdAppId) {

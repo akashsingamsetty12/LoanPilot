@@ -15,7 +15,7 @@ export async function queryAgent(
 
   const response = await apiClient.post<AgentResponse>(
     `/applications/${applicationId}/agent/query`,
-    { query, application_id: applicationId }
+    { question: query, query, application_id: applicationId }
   );
   return response.data;
 }
