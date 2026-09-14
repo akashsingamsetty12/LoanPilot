@@ -34,7 +34,6 @@ async def create_application(
 ):
     """Create a new loan application."""
     return await create_application_service(request, db)
-    pass
 
 
 @router.get("", response_model=ApplicationListResponse)

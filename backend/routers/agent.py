@@ -43,7 +43,14 @@ async def query_agent_endpoint(
             detail=f"Application '{app_id}' not found."
         )
 
-    return await run_agent(app_id, request.question, db)
+    prompt = request.question or request.query or ""
+    if not prompt.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Question or query cannot be empty."
+        )
+
+    return await run_agent(app_id, prompt.strip(), db)
 
 
 @router.post("/{app_id}/agent/query", response_model=AgentResponse)

@@ -11,13 +11,24 @@ Cognizant Explainability Note:
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class AgentQueryRequest(BaseModel):
     """User question to the 'Ask LoanPilot' chatbot."""
-    question: str = Field(..., min_length=1, description="Natural language question")
+    question: Optional[str] = Field(None, description="Natural language question")
+    query: Optional[str] = Field(None, description="Natural language query alias")
     conversation_id: Optional[str] = None  # For multi-turn chat
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            val = data.get("question") or data.get("query")
+            if val:
+                data["question"] = str(val).strip()
+                data["query"] = str(val).strip()
+        return data
 
 
 class EvidenceItem(BaseModel):
