@@ -62,19 +62,18 @@ export function NewApplication() {
   const [processingPipeline, setProcessingPipeline] = useState(false);
 
   const handleUploadAndProceed = async () => {
-    if (files.length > 0 && createdAppId) {
+    if (createdAppId) {
       setProcessingPipeline(true);
       try {
-        await upload();
+        if (files.some(f => f.status === 'pending')) {
+          await upload();
+        }
         await apiClient.post(`/applications/${createdAppId}/process`);
       } catch (err) {
         console.warn('Pipeline run notice:', err);
       } finally {
         setProcessingPipeline(false);
       }
-      // Navigate to review page
-      navigate(`/applications/${createdAppId}`);
-    } else if (createdAppId) {
       navigate(`/applications/${createdAppId}`);
     }
   };

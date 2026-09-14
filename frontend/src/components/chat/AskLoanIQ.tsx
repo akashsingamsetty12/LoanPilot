@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MessageSquare, X, Send, Sparkles } from 'lucide-react';
+import { MessageSquare, X, Send, Sparkles, FileText } from 'lucide-react';
 import type { ChatMessage as ChatMessageType } from '../../types';
 import { useAgent } from '../../hooks/useAgent';
 import { Spinner } from '../ui/Spinner';
@@ -221,6 +221,22 @@ function ChatBubble({ message }: { message: ChatMessageType }) {
         }
       >
         <div className="whitespace-pre-wrap">{message.content}</div>
+
+        {!isUser && message.sources && message.sources.length > 0 && (
+          <div className="mt-2.5 pt-2 border-t border-white/[0.08] flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] text-zinc-500 font-medium">Verified Sources:</span>
+            {message.sources.map((src, idx) => (
+              <span
+                key={idx}
+                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-white/[0.04] text-zinc-300 border border-white/[0.08]"
+              >
+                <FileText className="h-2.5 w-2.5 text-[#AAFF00]" />
+                <span>{src.document}</span>
+                {src.page && <span className="text-zinc-500">p.{src.page}</span>}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

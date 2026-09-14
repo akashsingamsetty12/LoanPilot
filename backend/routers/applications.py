@@ -74,7 +74,7 @@ async def list_applications(
             id=app.id,
             applicant_name=app.applicant_name,
             status=app.status,
-            document_count=len(app.documents) if app.documents else 0,
+            document_count=len(set(doc.filename for doc in app.documents)) if app.documents else 0,
             risk_level=app.risk_level,
             recommendation=app.recommendation,
             created_at=app.created_at,
@@ -110,9 +110,19 @@ async def get_application(
             detail=f"Application not found: {app_id}",
         )
 
-    # Format documents
+    # Format documents (deduplicating by filename to keep latest)
     doc_list = []
-    for doc in app.documents or []:
+    seen_filenames = set()
+    sorted_docs = sorted(
+        app.documents or [],
+        key=lambda d: d.created_at or datetime.min,
+        reverse=True,
+    )
+    for doc in sorted_docs:
+        fn = doc.filename or doc.id
+        if fn in seen_filenames:
+            continue
+        seen_filenames.add(fn)
         doc_list.append(
             {
                 "document_id": doc.id,
@@ -130,6 +140,7 @@ async def get_application(
                 "created_at": doc.created_at,
             }
         )
+    doc_list.reverse()
 
     # Format verification
     verification_data = None

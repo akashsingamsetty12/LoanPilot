@@ -45,6 +45,9 @@ def calculate_risk_score(verification_result: dict) -> tuple[float, list[Flag]]:
     for finding in findings:
         if not isinstance(finding, dict):
             continue
+        # Document completeness / missing documents are processed in the dedicated missing_documents loop below
+        if finding.get("field") == "document_completeness" or "missing" in _text(finding.get("type")).lower() or "missing" in _text(finding.get("evidence")).lower():
+            continue
         kind = _text(finding.get("type") or finding.get("flag_type") or finding.get("category")).lower()
         description = _text(finding.get("description") or finding.get("reason") or "Verification inconsistency detected")
         evidence = _text(finding.get("evidence"))

@@ -21,11 +21,13 @@ export function useAgent(applicationId: string) {
 
     try {
       const response = await queryAgent(applicationId, content);
+      const text = response.answer || response.response || 'Analysis complete.';
 
       const assistantMessage: ChatMessage = {
         id: `msg-${Date.now()}-resp`,
         role: 'assistant',
-        content: response.response,
+        content: text,
+        sources: response.sources,
         timestamp: new Date().toISOString(),
       };
 

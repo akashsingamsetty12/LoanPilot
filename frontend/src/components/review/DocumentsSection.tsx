@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { FileText, Eye } from 'lucide-react';
 import type { LoanDocument } from '../../types';
 import { getDocumentTypeLabel, classNames } from '../../lib/utils';
@@ -10,6 +11,17 @@ interface DocumentsSectionProps {
 }
 
 export function DocumentsSection({ documents, onViewDocument }: DocumentsSectionProps) {
+  const uniqueDocuments = useMemo(() => {
+    const seen = new Set<string>();
+    return documents.filter((doc) => {
+      const key = (doc.file_name || doc.document_id || '').toLowerCase();
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [documents]);
+
   const statusStyles: Record<string, { label: string; dot: string }> = {
     completed: { label: 'Completed', dot: 'bg-risk-low' },
     processing: { label: 'Processing', dot: 'bg-primary-300 animate-pulse' },
@@ -32,7 +44,7 @@ export function DocumentsSection({ documents, onViewDocument }: DocumentsSection
       >
         <div>
           <h3 className="text-base font-semibold" style={{ color: '#F0F0F0' }}>Documents</h3>
-          <p className="text-xs mt-0.5" style={{ color: '#666666' }}>{documents.length} document(s) submitted</p>
+          <p className="text-xs mt-0.5" style={{ color: '#666666' }}>{uniqueDocuments.length} document(s) submitted</p>
         </div>
       </div>
       <div className="overflow-x-auto">
@@ -48,14 +60,14 @@ export function DocumentsSection({ documents, onViewDocument }: DocumentsSection
             </tr>
           </thead>
           <tbody>
-            {documents.length === 0 ? (
+            {uniqueDocuments.length === 0 ? (
               <tr>
                 <td colSpan={6} className="py-8 text-center text-sm" style={{ color: '#666666' }}>
                   No documents uploaded yet.
                 </td>
               </tr>
             ) : (
-              documents.map((doc) => {
+              uniqueDocuments.map((doc) => {
                 const st = statusStyles[doc.status] || statusStyles.uploaded;
                 return (
                   <tr

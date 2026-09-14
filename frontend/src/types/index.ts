@@ -121,6 +121,10 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   timestamp: string;
+  sources?: {
+    document: string;
+    page: number;
+  }[];
 }
 
 export interface AgentQuery {

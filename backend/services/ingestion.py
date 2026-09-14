@@ -6,6 +6,7 @@ validation, storage, and document metadata.
 """
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import UploadFile
 from sqlalchemy import select
@@ -84,6 +85,40 @@ async def upload_document(
     if not validate_file_size(len(content)):
         raise ValueError("File size exceeds the allowed limit.")
 
+    target_filename = file.filename or "document"
+
+    # Check if a document with this filename already exists for this application
+    existing_result = await db.execute(
+        select(Document).where(
+            Document.application_id == app_id,
+            Document.filename == target_filename,
+        )
+    )
+    existing_doc = existing_result.scalars().first()
+
+    if existing_doc is not None:
+        upload_path = Path(existing_doc.file_path) if existing_doc.file_path else get_upload_path(app_id, existing_doc.id, target_filename)
+        upload_path.parent.mkdir(parents=True, exist_ok=True)
+        upload_path.write_bytes(content)
+
+        existing_doc.file_path = str(upload_path)
+        existing_doc.file_size = len(content)
+        existing_doc.file_type = file.content_type
+        existing_doc.status = "uploaded"
+        existing_doc.created_at = datetime.now(timezone.utc)
+
+        application.status = "documents_uploaded"
+        application.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(existing_doc)
+
+        return DocumentUploadResponse(
+            document_id=existing_doc.id,
+            filename=existing_doc.filename,
+            file_type=existing_doc.file_type,
+            status=existing_doc.status,
+        )
+
     # Generate document ID
     doc_id = generate_document_id()
     while (await db.execute(select(Document.id).where(Document.id == doc_id))).scalar_one_or_none():
@@ -93,7 +128,7 @@ async def upload_document(
     upload_path = get_upload_path(
         app_id,
         doc_id,
-        file.filename or "document",
+        target_filename,
     )
     upload_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -104,7 +139,7 @@ async def upload_document(
     document = Document(
         id=doc_id,
         application_id=app_id,
-        filename=file.filename or "document",
+        filename=target_filename,
         file_path=str(upload_path),
         file_type=file.content_type,
         file_size=len(content),
@@ -152,6 +187,15 @@ async def list_documents(app_id: str, db: AsyncSession) -> list:
     result = await db.execute(
         select(Document)
         .where(Document.application_id == app_id)
-        .order_by(Document.created_at)
+        .order_by(Document.created_at.desc())
     )
-    return list(result.scalars().all())
+    docs = list(result.scalars().all())
+    seen = set()
+    unique_docs = []
+    for doc in docs:
+        fn = doc.filename or doc.id
+        if fn not in seen:
+            seen.add(fn)
+            unique_docs.append(doc)
+    unique_docs.reverse()
+    return unique_docs

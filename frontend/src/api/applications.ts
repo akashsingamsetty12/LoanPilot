@@ -7,8 +7,18 @@ const useMock = import.meta.env.VITE_USE_MOCK === 'true';
 function normalizeApplication(data: any): Application {
   const appId = data.application_id || data.id || 'APP-0001';
 
-  // Format documents
-  const docs = (data.documents || []).map((d: any) => ({
+  // Format documents (deduplicating by filename)
+  const rawDocs = data.documents || [];
+  const seenFileNames = new Set<string>();
+  const uniqueDocs: any[] = [];
+  for (const d of rawDocs) {
+    const fn = (d.file_name || d.filename || d.document_id || d.id || '').toLowerCase();
+    if (fn && seenFileNames.has(fn)) continue;
+    if (fn) seenFileNames.add(fn);
+    uniqueDocs.push(d);
+  }
+
+  const docs = uniqueDocs.map((d: any) => ({
     document_id: d.document_id || d.id || '',
     file_name: d.file_name || d.filename || '',
     type: d.type || d.doc_type || 'other',
@@ -38,14 +48,16 @@ function normalizeApplication(data: any): Application {
     status: 'PASS' as const
   } : m);
 
-  const mismatches = (ver.mismatches || []).map((m: any) => typeof m === 'object' && m.field ? {
-    field_name: m.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
-    values: [
-      { document: m.sources?.[0] || 'Source A', value: String(m.values?.[0] ?? '') },
-      { document: m.sources?.[1] || 'Source B', value: String(m.values?.[1] ?? '') }
-    ],
-    status: 'MISMATCH' as const
-  } : m);
+  const mismatches = (ver.mismatches || [])
+    .filter((m: any) => m.field !== 'document_completeness')
+    .map((m: any) => typeof m === 'object' && m.field ? {
+      field_name: m.field.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+      values: [
+        { document: m.sources?.[0] || 'Source A', value: String(m.values?.[0] ?? '') },
+        { document: m.sources?.[1] || 'Source B', value: String(m.values?.[1] ?? '') }
+      ],
+      status: 'MISMATCH' as const
+    } : m);
 
   const missingDocs = ver.missing_documents || [];
 
@@ -66,13 +78,85 @@ function normalizeApplication(data: any): Application {
     risk: {
       score: riskScore,
       level: riskLevel,
-      flags: rawFlags.map((f: any, idx: number) => ({
-        id: String(idx + 1),
-        severity: f.severity || 'LOW',
-        reason: f.reason || 'Verification finding',
-        details: f.details ? JSON.stringify(f.details) : (f.evidence || ''),
-        evidence: [{ document: f.evidence || 'Document', page: 1, value: f.reason || '' }]
-      }))
+      flags: (() => {
+        const seenFlags = new Set<string>();
+        const mappedFlags: any[] = [];
+
+        for (let idx = 0; idx < rawFlags.length; idx++) {
+          const f = rawFlags[idx];
+          const severity = f.severity || 'LOW';
+          let rawReason = f.reason || 'Verification finding';
+          let details = '';
+          let points = 0;
+          let evidenceDoc = 'Document';
+          let evidenceVal = '';
+
+          let dObj: any = f.details;
+          if (typeof dObj === 'string' && dObj.trim().startsWith('{')) {
+            try { dObj = JSON.parse(dObj); } catch {}
+          }
+
+          // Skip redundant generic findings for missing documents already handled
+          if (
+            (rawReason.toLowerCase().includes('inconsistency') || rawReason.toLowerCase().includes('document completeness')) &&
+            dObj &&
+            typeof dObj === 'object' &&
+            (dObj.field === 'document_completeness' || String(dObj.evidence || '').toLowerCase().includes('missing'))
+          ) {
+            continue;
+          }
+
+          if (typeof dObj === 'object' && dObj !== null) {
+            points = dObj.points || 0;
+            if (dObj.evidence) {
+              details = String(dObj.evidence);
+            } else if (dObj.field && dObj.field !== 'document_completeness') {
+              const cleanField = String(dObj.field).replace(/_/g, ' ');
+              details = `Discrepancy identified in ${cleanField} across submitted records.`;
+            } else if (rawReason.toLowerCase().includes('missing')) {
+              details = 'This required verification document was not found in the application submission.';
+            } else {
+              details = 'Verification inconsistency flagged by automated rule engine.';
+            }
+          } else if (typeof dObj === 'string' && dObj.trim()) {
+            details = dObj.trim();
+          } else {
+            details = f.evidence || 'Requires manual underwriter confirmation.';
+          }
+
+          // Clean up title & evidence for missing docs
+          let cleanReason = rawReason;
+          if (rawReason.toLowerCase().includes('missing required document:')) {
+            const docType = rawReason.split(':').slice(1).join(':').trim();
+            const cleanDoc = docType.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+            cleanReason = `Missing Document: ${cleanDoc}`;
+            evidenceDoc = cleanDoc;
+            evidenceVal = 'Mandatory verification document is missing from this loan file.';
+          } else if (f.field && f.field !== 'document_completeness') {
+            const fieldLabel = f.field.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+            cleanReason = `${fieldLabel} Mismatch`;
+            evidenceDoc = fieldLabel;
+            evidenceVal = details;
+          } else {
+            evidenceDoc = 'Verification Rule';
+            evidenceVal = details;
+          }
+
+          const dedupeKey = cleanReason.toLowerCase();
+          if (seenFlags.has(dedupeKey)) continue;
+          seenFlags.add(dedupeKey);
+
+          mappedFlags.push({
+            id: String(mappedFlags.length + 1),
+            severity: severity as any,
+            reason: cleanReason,
+            details: points > 0 ? `${details} (Risk penalty: +${points} pts)` : details,
+            evidence: [{ document: evidenceDoc, page: 1, value: evidenceVal }]
+          });
+        }
+
+        return mappedFlags;
+      })()
     },
     recommendation: data.recommendation || 'NEEDS_HUMAN_REVIEW'
   };

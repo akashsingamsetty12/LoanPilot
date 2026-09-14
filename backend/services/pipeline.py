@@ -56,7 +56,15 @@ async def process_application(app_id: str, db: AsyncSession) -> dict:
     await db.commit()
 
     completed_steps = []
-    documents = application.documents or []
+    raw_docs = application.documents or []
+    seen_doc_names = set()
+    documents = []
+    for d in sorted(raw_docs, key=lambda x: x.created_at or datetime.min, reverse=True):
+        fn = d.filename or d.id
+        if fn not in seen_doc_names:
+            seen_doc_names.add(fn)
+            documents.append(d)
+    documents.reverse()
 
     # 3. Process documents (OCR → Classification → Extraction)
     for doc in documents:
