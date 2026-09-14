@@ -232,7 +232,14 @@ async def decide_application(
     app.decision_notes = request.notes
     app.decided_by = request.decided_by or "underwriter"
     app.decided_at = datetime.now(timezone.utc)
-    app.status = "decided"
+    if normalized_decision == "approved":
+        app.status = "completed"
+    elif normalized_decision == "rejected":
+        app.status = "rejected"
+    elif normalized_decision == "needs_more_info":
+        app.status = "review"
+    else:
+        app.status = "completed"
     app.updated_at = datetime.now(timezone.utc)
 
     await db.commit()
@@ -241,7 +248,7 @@ async def decide_application(
     return ApplicationSummary(
         id=app.id,
         applicant_name=app.applicant_name,
-        status=app.status,
+        status=app.decision if app.decision in ("approved", "rejected") else app.status,
         document_count=len(app.documents) if app.documents else 0,
         risk_level=app.risk_level,
         recommendation=app.recommendation,

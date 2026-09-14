@@ -104,12 +104,34 @@ function normalizeApplication(data: any): Application {
 
   const missingDocs = ver.missing_documents || [];
 
+  const rawStatus = String(data.status || '').toLowerCase();
+  const rawDecision = String(data.decision || '').toLowerCase();
+  let normalizedStatus: any = 'draft';
+
+  if (rawDecision === 'approved' || rawStatus === 'completed' || rawStatus === 'approved') {
+    normalizedStatus = 'completed';
+  } else if (rawDecision === 'rejected' || rawStatus === 'rejected') {
+    normalizedStatus = 'rejected';
+  } else if (rawStatus === 'review' || rawStatus === 'needs_more_info' || rawDecision === 'needs_more_info') {
+    normalizedStatus = 'review';
+  } else if (rawStatus === 'processing' || rawStatus === 'uploading') {
+    normalizedStatus = rawStatus;
+  } else if (rawStatus === 'decided') {
+    normalizedStatus = rawDecision === 'rejected' ? 'rejected' : 'completed';
+  } else {
+    normalizedStatus = rawStatus || 'draft';
+  }
+
   return {
     application_id: appId,
     applicant_name: data.applicant_name || 'Applicant',
     applicant_email: data.applicant_email || 'applicant@example.com',
     loan_type: data.loan_type || 'Home Loan',
-    status: data.status || 'draft',
+    status: normalizedStatus,
+    decision: data.decision,
+    decision_notes: data.decision_notes,
+    decided_by: data.decided_by,
+    decided_at: data.decided_at,
     created_at: data.created_at || new Date().toISOString(),
     updated_at: data.updated_at || new Date().toISOString(),
     documents: docs,

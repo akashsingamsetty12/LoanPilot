@@ -41,6 +41,19 @@ export function ApplicationReview() {
   const [actionReason, setActionReason] = useState('');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [submittingDecision, setSubmittingDecision] = useState(false);
+  const [localDecision, setLocalDecision] = useState<'approved' | 'rejected' | null>(null);
+
+  const isApproved =
+    localDecision === 'approved' ||
+    application?.decision === 'approved' ||
+    application?.status === 'completed';
+
+  const isRejected =
+    localDecision === 'rejected' ||
+    application?.decision === 'rejected' ||
+    application?.status === 'rejected';
+
+  const isDecided = isApproved || isRejected;
 
   const handleViewDocument = (docId: string) => {
     const doc = application?.documents?.find((d) => d.document_id === docId);
@@ -75,6 +88,9 @@ export function ApplicationReview() {
           : modalAction === 'reject'
             ? 'Application Rejected'
             : 'Additional Information Requested';
+
+      if (modalAction === 'approve') setLocalDecision('approved');
+      if (modalAction === 'reject') setLocalDecision('rejected');
 
       setActionSuccess(`${actionText} successfully recorded.`);
       setModalAction(null);
@@ -139,30 +155,59 @@ export function ApplicationReview() {
             >
               Generate Report
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={AlertCircle}
-              onClick={() => setModalAction('request_info')}
-            >
-              Request Info
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              icon={XCircle}
-              onClick={() => setModalAction('reject')}
-            >
-              Reject
-            </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              icon={CheckCircle2}
-              onClick={() => setModalAction('approve')}
-            >
-              Approve Application
-            </Button>
+
+            {isApproved ? (
+              <div
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold"
+                style={{
+                  background: 'rgba(48,209,88,0.12)',
+                  color: '#30D158',
+                  border: '1px solid rgba(48,209,88,0.25)',
+                }}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                <span>Application Approved</span>
+              </div>
+            ) : isRejected ? (
+              <div
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold"
+                style={{
+                  background: 'rgba(255,69,58,0.12)',
+                  color: '#FF453A',
+                  border: '1px solid rgba(255,69,58,0.25)',
+                }}
+              >
+                <XCircle className="h-4 w-4" />
+                <span>Application Rejected</span>
+              </div>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  icon={AlertCircle}
+                  onClick={() => setModalAction('request_info')}
+                >
+                  Request Info
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  icon={XCircle}
+                  onClick={() => setModalAction('reject')}
+                >
+                  Reject
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={CheckCircle2}
+                  onClick={() => setModalAction('approve')}
+                >
+                  Approve Application
+                </Button>
+              </>
+            )}
           </div>
         </div>
 

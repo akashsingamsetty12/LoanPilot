@@ -45,18 +45,28 @@ async def download_report(
     app_id: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Download the report as standalone HTML document."""
+    """Download the report as official PDF verification dossier."""
     settings = get_settings()
-    report_file = os.path.join(settings.UPLOAD_DIR, app_id, "reports", f"report_{app_id}.html")
-    if not os.path.exists(report_file):
+    pdf_file = os.path.join(settings.UPLOAD_DIR, app_id, "reports", f"report_{app_id}.pdf")
+    if not os.path.exists(pdf_file):
         await run_generate_report(app_id, db)
 
-    if os.path.exists(report_file):
+    if os.path.exists(pdf_file):
         return FileResponse(
-            report_file,
-            media_type="text/html",
-            filename=f"LoanVerificationReport_{app_id}.html"
+            pdf_file,
+            media_type="application/pdf",
+            filename=f"LoanPilot_Report_{app_id}.pdf"
         )
 
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report file could not be found.")
+    # Fallback to HTML if PDF is not available
+    html_file = os.path.join(settings.UPLOAD_DIR, app_id, "reports", f"report_{app_id}.html")
+    if os.path.exists(html_file):
+        return FileResponse(
+            html_file,
+            media_type="text/html",
+            filename=f"LoanPilot_Report_{app_id}.html"
+        )
+
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Report file could not be generated.")
+
 

@@ -88,7 +88,7 @@ export function Report() {
                   </div>
                 </div>
                 <Button onClick={handleDownload} loading={downloading} variant="secondary" size="sm" icon={Download}>
-                  Download
+                  Download PDF
                 </Button>
               </div>
 

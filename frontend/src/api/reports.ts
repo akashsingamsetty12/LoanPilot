@@ -26,32 +26,17 @@ export async function getReport(applicationId: string): Promise<VerificationRepo
 }
 
 export async function downloadReport(applicationId: string): Promise<void> {
-  if (useMock) {
-    const app = mockApplications.find(a => a.application_id === applicationId);
-    const report = app ? buildReportFromApp(app) : buildFallbackReport(applicationId);
-    const text = generateReportText(report);
-    const blob = new Blob([text], { type: 'text/plain' });
-    triggerDownload(blob, `LoanPilot_Report_${applicationId}.txt`);
-    return;
-  }
-
   try {
     const response = await apiClient.get(`/applications/${applicationId}/report/download`, {
       responseType: 'blob',
     });
 
-    const headerVal = response.headers['content-type'];
-    const contentType = typeof headerVal === 'string' ? headerVal : 'application/pdf';
-    const ext = contentType.includes('pdf') ? 'pdf' : 'json';
-    const blob = new Blob([response.data], { type: contentType });
-    triggerDownload(blob, `LoanPilot_Report_${applicationId}.${ext}`);
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    triggerDownload(blob, `LoanPilot_Report_${applicationId}.pdf`);
   } catch (err) {
-    console.warn('Report download endpoint failed, generating local text report:', err);
-    const app = mockApplications.find(a => a.application_id === applicationId);
-    const report = app ? buildReportFromApp(app) : buildFallbackReport(applicationId);
-    const text = generateReportText(report);
-    const blob = new Blob([text], { type: 'text/plain' });
-    triggerDownload(blob, `LoanPilot_Report_${applicationId}.txt`);
+    console.warn('Report download endpoint failed, falling back to direct window open:', err);
+    const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
+    window.open(`${backendUrl}/applications/${applicationId}/report/download`, '_blank');
   }
 }
 

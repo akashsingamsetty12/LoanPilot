@@ -119,6 +119,266 @@ def _generate_report_html(
 </html>"""
 
 
+def _generate_report_pdf(
+    app: Application,
+    docs: list[Document],
+    vr: Optional[VerificationResult],
+    risk: Optional[RiskAssessment],
+    output_path: str
+) -> None:
+    """Generate a clean, high-precision PDF verification dossier using ReportLab."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    )
+
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=letter,
+        leftMargin=36,
+        rightMargin=36,
+        topMargin=36,
+        bottomMargin=36
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'DocTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=17,
+        leading=21,
+        textColor=colors.HexColor('#0F172A'),
+        spaceAfter=2
+    )
+    subtitle_style = ParagraphStyle(
+        'DocSubtitle',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8.5,
+        leading=11,
+        textColor=colors.HexColor('#64748B'),
+        spaceAfter=6
+    )
+    section_h2 = ParagraphStyle(
+        'SectionH2',
+        parent=styles['Heading2'],
+        fontName='Helvetica-Bold',
+        fontSize=11,
+        leading=14,
+        textColor=colors.HexColor('#1E293B'),
+        spaceBefore=8,
+        spaceAfter=4
+    )
+    cell_bold = ParagraphStyle(
+        'CellBold',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#1E293B')
+    )
+    cell_normal = ParagraphStyle(
+        'CellNormal',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#334155')
+    )
+    cell_header = ParagraphStyle(
+        'CellHeader',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#0F172A')
+    )
+    cell_danger = ParagraphStyle(
+        'CellDanger',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#DC2626')
+    )
+    cell_success = ParagraphStyle(
+        'CellSuccess',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=8,
+        leading=10,
+        textColor=colors.HexColor('#16A34A')
+    )
+
+    risk_score = risk.score if risk else (app.risk_score or 0.0)
+    risk_level = risk.level if risk else (app.risk_level or "LOW")
+    recommendation = risk.recommendation if risk else (app.recommendation or "NEEDS_HUMAN_REVIEW")
+    flags = risk.flags if risk and isinstance(risk.flags, list) else []
+    matches = vr.matches if vr and isinstance(vr.matches, list) else []
+    mismatches = vr.mismatches if vr and isinstance(vr.mismatches, list) else []
+    missing_docs = vr.missing_documents if vr and isinstance(vr.missing_documents, list) else []
+
+    risk_color = colors.HexColor('#DC2626') if risk_level == 'HIGH' else (colors.HexColor('#D97706') if risk_level == 'MEDIUM' else colors.HexColor('#16A34A'))
+
+    story = []
+
+    # 1. Header Banner
+    header_data = [
+        [
+            Paragraph("<b>LoanPilot AI — Loan Verification Dossier</b>", title_style),
+            Paragraph(f"<font color='{risk_color.hexval()}'><b>RISK: {risk_level} ({risk_score:.0f}/100)</b></font>", ParagraphStyle('RiskBadge', fontName='Helvetica-Bold', fontSize=12, alignment=2))
+        ],
+        [
+            Paragraph(f"Application ID: <b>{app.id}</b> | Generated: {datetime.now(timezone.utc).strftime('%d %b %Y, %H:%M UTC')}", subtitle_style),
+            Paragraph(f"Recommendation: <b>{recommendation.replace('_', ' ')}</b>", ParagraphStyle('RecText', fontName='Helvetica-Bold', fontSize=8.5, alignment=2, textColor=colors.HexColor('#334155')))
+        ]
+    ]
+    header_table = Table(header_data, colWidths=[360, 180])
+    header_table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING', (0, 0), (-1, -1), 0),
+    ]))
+    story.append(header_table)
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#CBD5E1'), spaceAfter=6, spaceBefore=3))
+
+    # 2. Applicant & Loan Summary Grid
+    story.append(Paragraph("1. Applicant & Financial Overview", section_h2))
+    loan_amt_str = f"Rs. {app.loan_amount:,.0f}" if getattr(app, "loan_amount", None) is not None else "N/A"
+    income_str = f"Rs. {app.income_annum:,.0f}" if getattr(app, "income_annum", None) is not None else "N/A"
+    cibil_str = str(app.cibil_score) if getattr(app, "cibil_score", None) else "N/A"
+    decision_str = (app.decision or app.status or "Pending Review").upper()
+
+    summary_data = [
+        [Paragraph("Applicant Name", cell_header), Paragraph("Loan Amount", cell_header), Paragraph("Declared Annual Income", cell_header), Paragraph("CIBIL Score", cell_header)],
+        [Paragraph(app.applicant_name or "N/A", cell_bold), Paragraph(loan_amt_str, cell_normal), Paragraph(income_str, cell_normal), Paragraph(cibil_str, cell_normal)],
+        [Paragraph("Loan Type", cell_header), Paragraph("Underwriting Status", cell_header), Paragraph("Decided By", cell_header), Paragraph("Decision Date", cell_header)],
+        [Paragraph(getattr(app, 'loan_type', 'Home Loan') or 'Home Loan', cell_normal), Paragraph(f"<b>{decision_str}</b>", cell_success if "APPROV" in decision_str else (cell_danger if "REJECT" in decision_str else cell_bold)), Paragraph(app.decided_by or "Loan Officer", cell_normal), Paragraph(app.decided_at.strftime('%d %b %Y') if getattr(app, 'decided_at', None) else "Pending", cell_normal)]
+    ]
+    summary_table = Table(summary_data, colWidths=[135, 135, 135, 135])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
+        ('BACKGROUND', (0, 2), (-1, 2), colors.HexColor('#F1F5F9')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(summary_table)
+    story.append(Spacer(1, 6))
+
+    # 3. Document Verification Summary
+    story.append(Paragraph("2. Document Verification Summary", section_h2))
+    doc_rows = [
+        [Paragraph("Document Name", cell_header), Paragraph("Type", cell_header), Paragraph("Status", cell_header), Paragraph("Pages", cell_header), Paragraph("OCR Confidence", cell_header)]
+    ]
+    if docs:
+        for d in docs:
+            conf_pct = f"{int(d.ocr_confidence * 100)}%" if d.ocr_confidence else "N/A"
+            doc_rows.append([
+                Paragraph(d.filename or "Unnamed Document", cell_bold),
+                Paragraph(d.doc_type or "Unknown", cell_normal),
+                Paragraph(d.status or "Completed", cell_success if d.status == "completed" else cell_normal),
+                Paragraph(str(d.pages or 1), cell_normal),
+                Paragraph(conf_pct, cell_normal)
+            ])
+    else:
+        doc_rows.append([Paragraph("No documents uploaded.", cell_normal), Paragraph("", cell_normal), Paragraph("", cell_normal), Paragraph("", cell_normal), Paragraph("", cell_normal)])
+
+    doc_table = Table(doc_rows, colWidths=[180, 110, 80, 50, 120])
+    doc_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(doc_table)
+    story.append(Spacer(1, 6))
+
+    # 4. Cross-Document Consistency Findings
+    story.append(Paragraph("3. Cross-Document Consistency & Verification", section_h2))
+    mismatch_rows = [
+        [Paragraph("Field / Attribute", cell_header), Paragraph("Source Documents", cell_header), Paragraph("Extracted Values", cell_header), Paragraph("Audit Finding", cell_header)]
+    ]
+    if mismatches:
+        for m in mismatches:
+            if isinstance(m, dict):
+                mismatch_rows.append([
+                    Paragraph(str(m.get("field", "Discrepancy")).replace("_", " ").title(), cell_danger),
+                    Paragraph(str(m.get("sources", "")), cell_normal),
+                    Paragraph(str(m.get("values", "")), cell_normal),
+                    Paragraph(str(m.get("evidence", "")), cell_normal)
+                ])
+    else:
+        mismatch_rows.append([Paragraph("No cross-document discrepancies detected. All critical fields match.", cell_success), Paragraph("", cell_normal), Paragraph("", cell_normal), Paragraph("", cell_normal)])
+
+    mismatch_table = Table(mismatch_rows, colWidths=[120, 130, 140, 150])
+    mismatch_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(mismatch_table)
+
+    if missing_docs:
+        story.append(Spacer(1, 3))
+        story.append(Paragraph(f"<font color='#DC2626'><b>Missing Required Documents:</b> {', '.join(missing_docs)}</font>", cell_danger))
+
+    story.append(Spacer(1, 6))
+
+    # 5. Risk Assessment & Evidence Flags
+    story.append(Paragraph("4. Risk Assessment & Evidence Flags", section_h2))
+    if flags:
+        flag_rows = [
+            [Paragraph("Severity", cell_header), Paragraph("Risk Flag / Discrepancy", cell_header), Paragraph("Evidence / Details", cell_header)]
+        ]
+        for f in flags:
+            if isinstance(f, dict):
+                sev = f.get("severity", "MEDIUM")
+                s_color = cell_danger if sev == "HIGH" else (ParagraphStyle('SevMed', fontName='Helvetica-Bold', fontSize=8, textColor=colors.HexColor('#D97706')))
+                flag_rows.append([
+                    Paragraph(f"[{sev}]", s_color),
+                    Paragraph(f.get("reason", "Risk finding"), cell_bold),
+                    Paragraph(str(f.get("evidence", "") or f.get("details", "")), cell_normal)
+                ])
+        flag_table = Table(flag_rows, colWidths=[70, 200, 270])
+        flag_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#F1F5F9')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#E2E8F0')),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ]))
+        story.append(flag_table)
+    else:
+        story.append(Paragraph("<font color='#16A34A'><b>No risk flags raised. Application satisfies primary underwriting verification rules.</b></font>", cell_success))
+
+    story.append(Spacer(1, 8))
+
+    # 6. Officer Decision Box & Audit Sign-Off
+    decision_title = f"Final Decision: {decision_str}"
+    officer_notes = app.decision_notes or "No officer comments recorded."
+    dec_box_data = [
+        [Paragraph(f"<b>{decision_title}</b>", ParagraphStyle('DecTitle', fontName='Helvetica-Bold', fontSize=9.5, textColor=colors.HexColor('#0F172A')))],
+        [Paragraph(f"<b>Underwriter Notes:</b> {officer_notes}", cell_normal)],
+        [Paragraph("<i>Notice: This verification dossier was compiled by LoanPilot AI. Final credit approval and disbursement authorization remain subject to institution credit policy and compliance mandates.</i>", ParagraphStyle('Disc', fontName='Helvetica-Oblique', fontSize=7, leading=9, textColor=colors.HexColor('#64748B')))]
+    ]
+    dec_table = Table(dec_box_data, colWidths=[540])
+    dec_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors.HexColor('#F8FAFC')),
+        ('BOX', (0, 0), (-1, -1), 1, colors.HexColor('#CBD5E1')),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(dec_table)
+
+    doc.build(story)
+
+
 async def generate_report(app_id: str, db: AsyncSession) -> ReportResponse:
     """Generate a comprehensive loan verification report."""
     stmt = select(Application).where(Application.id == app_id)
@@ -149,6 +409,15 @@ async def generate_report(app_id: str, db: AsyncSession) -> ReportResponse:
     report_file = os.path.join(report_dir, f"report_{app_id}.html")
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(report_html)
+
+    # Generate PDF version
+    pdf_file = os.path.join(report_dir, f"report_{app_id}.pdf")
+    try:
+        _generate_report_pdf(app, docs, vr, risk, pdf_file)
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] Failed to generate PDF report: {e}")
+        traceback.print_exc()
 
     # Format verification results for frontend
     verif_results = []

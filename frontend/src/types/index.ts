@@ -96,6 +96,10 @@ export interface Application {
   applicant_email: string;
   loan_type: string;
   status: ApplicationStatus;
+  decision?: string;
+  decision_notes?: string;
+  decided_by?: string;
+  decided_at?: string;
   created_at: string;
   updated_at: string;
   documents: LoanDocument[];
