@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Save, Shield, Sliders } from 'lucide-react';
+import { Save, Sliders } from 'lucide-react';
 import { Topbar } from '../components/layout/Topbar';
 import { Button } from '../components/ui/Button';
 
@@ -105,46 +105,6 @@ export function Settings() {
                   <option value="LENIENT">Lenient (Fewer flagged mismatches)</option>
                 </select>
               </div>
-            </div>
-          </div>
-
-          {/* Compliance & Security */}
-          <div
-            className="p-6 rounded-2xl"
-            style={{
-              background: '#111111',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <div
-              className="flex items-center gap-3 mb-5 pb-4"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
-            >
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(170,255,0,0.1)', color: '#AAFF00' }}
-              >
-                <Shield className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold" style={{ color: '#F0F0F0' }}>
-                  Human-in-the-Loop & Audit Compliance
-                </h2>
-                <p className="text-xs" style={{ color: '#666666' }}>
-                  Explainability and decision safeguards for loan officer approvals
-                </p>
-              </div>
-            </div>
-
-            <div className="text-xs space-y-2.5" style={{ color: '#888888' }}>
-              <p className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: '#34C759' }}></span>
-                <span>AI Recommendation engine operates strictly in advisory mode.</span>
-              </p>
-              <p className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full" style={{ background: '#34C759' }}></span>
-                <span>All approvals or rejections require manual officer confirmation with audit notes.</span>
-              </p>
             </div>
           </div>
 
