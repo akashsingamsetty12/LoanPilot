@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Filter, RefreshCw } from 'lucide-react';
+import { Plus, Filter, RefreshCw, TrendingUp } from 'lucide-react';
 import { Topbar } from '../components/layout/Topbar';
 import { SummaryCards } from '../components/applications/SummaryCards';
 import { ApplicationTable } from '../components/applications/ApplicationTable';
@@ -10,6 +10,8 @@ import { ErrorState } from '../components/ui/ErrorState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useApplications } from '../hooks/useApplication';
 import type { ApplicationStatus } from '../types';
+
+const STATUS_TABS = ['ALL', 'review', 'processing', 'completed', 'rejected'] as const;
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -28,25 +30,43 @@ export function Dashboard() {
     });
   }, [applications, statusFilter, searchQuery]);
 
+  const getTabLabel = (status: (typeof STATUS_TABS)[number]) => {
+    if (status === 'ALL') return `All (${applications.length})`;
+    const count = applications.filter((a) => a.status === status).length;
+    const labels: Record<string, string> = {
+      review: 'Under Review',
+      processing: 'Processing',
+      completed: 'Completed',
+      rejected: 'Rejected',
+    };
+    return `${labels[status]} (${count})`;
+  };
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: '#0A0A0A' }}>
       <Topbar
         title="Dashboard"
-        subtitle="LoanIQ AI Document Processing & Verification Agent"
+        subtitle="LoanPilot AI Document Processing & Verification Agent"
       />
 
-      <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6">
-        {/* Top actions & summary */}
+      <main className="flex-1 p-6 max-w-7xl w-full mx-auto space-y-6 animate-fade-in">
+        {/* Header row */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-charcoal">Applications Overview</h2>
-            <p className="text-sm text-charcoal-muted">
-              Monitor, review, and make human decisions on processed loan applications.
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-4 w-4" style={{ color: '#AAFF00' }} />
+              <h2 className="text-xl font-bold" style={{ color: '#F0F0F0' }}>
+                Applications Overview
+              </h2>
+            </div>
+            <p className="text-sm" style={{ color: '#444444' }}>
+              Monitor, review, and make decisions on processed loan applications.
             </p>
           </div>
+
           <div className="flex items-center gap-3">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               icon={RefreshCw}
               onClick={refetch}
@@ -65,79 +85,107 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Summary Metrics Cards */}
+        {/* Summary Metric Cards */}
         <SummaryCards applications={applications} />
 
-        {/* Filters and Table Controls */}
-        <div className="bg-white p-4 rounded-lg border border-surface-300 shadow-sm space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Filters & Table */}
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{
+            background: '#111111',
+            border: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          {/* Filter bar */}
+          <div
+            className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          >
             {/* Status Tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0">
-              <span className="text-xs font-semibold text-charcoal-muted uppercase mr-2 flex items-center gap-1">
-                <Filter className="h-3.5 w-3.5" /> Filter:
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+              <span
+                className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 mr-1 flex-shrink-0"
+                style={{ color: '#444444' }}
+              >
+                <Filter className="h-3 w-3" />
+                Filter
               </span>
-              {(['ALL', 'review', 'processing', 'completed', 'rejected'] as const).map(
-                (status) => (
-                  <button
-                    key={status}
-                    onClick={() => setStatusFilter(status as any)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors capitalize whitespace-nowrap ${
-                      statusFilter === status
-                        ? 'bg-brand-600 text-white shadow-xs'
-                        : 'bg-surface-100 text-charcoal-muted hover:bg-surface-200 hover:text-charcoal'
-                    }`}
-                  >
-                    {status === 'ALL'
-                      ? `All (${applications.length})`
-                      : status === 'review'
-                      ? `Under Review (${applications.filter((a) => a.status === 'review').length})`
-                      : status === 'processing'
-                      ? `Processing (${applications.filter((a) => a.status === 'processing').length})`
-                      : status === 'completed'
-                      ? `Completed (${applications.filter((a) => a.status === 'completed').length})`
-                      : `Rejected (${applications.filter((a) => a.status === 'rejected').length})`}
-                  </button>
-                )
-              )}
+              {STATUS_TABS.map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setStatusFilter(status as any)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 whitespace-nowrap capitalize"
+                  style={
+                    statusFilter === status
+                      ? {
+                          background: 'rgba(170,255,0,0.12)',
+                          color: '#AAFF00',
+                          border: '1px solid rgba(170,255,0,0.2)',
+                        }
+                      : {
+                          background: '#1A1A1A',
+                          color: '#555555',
+                          border: '1px solid rgba(255,255,255,0.06)',
+                        }
+                  }
+                >
+                  {getTabLabel(status)}
+                </button>
+              ))}
             </div>
 
             {/* Search Input */}
-            <div className="w-full md:w-64">
+            <div className="w-full md:w-60 flex-shrink-0">
               <input
                 type="text"
                 placeholder="Search applicant or ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="input-field w-full text-xs"
+                aria-label="Search applications"
               />
             </div>
           </div>
 
           {/* Table / Content States */}
-          {loading ? (
-            <div className="py-12 flex justify-center">
-              <Spinner size="lg" text="Loading loan applications..." />
-            </div>
-          ) : error ? (
-            <ErrorState
-              title="Failed to load applications"
-              message={error}
-              onRetry={refetch}
-            />
-          ) : filteredApplications.length === 0 ? (
-            <EmptyState
-              title="No applications found"
-              message={
-                searchQuery || statusFilter !== 'ALL'
-                  ? 'No applications match your selected filter criteria.'
-                  : 'Start by uploading documents to create your first loan application.'
-              }
-              actionLabel={searchQuery || statusFilter !== 'ALL' ? undefined : 'Create New Application'}
-              onAction={searchQuery || statusFilter !== 'ALL' ? undefined : () => navigate('/applications/new')}
-            />
-          ) : (
-            <ApplicationTable applications={filteredApplications} />
-          )}
+          <div className="p-1">
+            {loading ? (
+              <div className="py-16 flex justify-center">
+                <Spinner size="lg" text="Loading loan applications..." />
+              </div>
+            ) : error ? (
+              <div className="p-4">
+                <ErrorState
+                  title="Failed to load applications"
+                  message={error}
+                  onRetry={refetch}
+                />
+              </div>
+            ) : filteredApplications.length === 0 ? (
+              <div className="p-4">
+                <EmptyState
+                  title="No applications found"
+                  message={
+                    searchQuery || statusFilter !== 'ALL'
+                      ? 'No applications match your selected filter criteria.'
+                      : 'Start by uploading documents to create your first loan application.'
+                  }
+                  actionLabel={
+                    searchQuery || statusFilter !== 'ALL'
+                      ? undefined
+                      : 'Create New Application'
+                  }
+                  onAction={
+                    searchQuery || statusFilter !== 'ALL'
+                      ? undefined
+                      : () => navigate('/applications/new')
+                  }
+                />
+              </div>
+            ) : (
+              <ApplicationTable applications={filteredApplications} />
+            )}
+          </div>
         </div>
       </main>
     </div>

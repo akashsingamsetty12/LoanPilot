@@ -4,6 +4,7 @@ import { Dashboard } from './pages/Dashboard';
 import { NewApplication } from './pages/NewApplication';
 import { ApplicationReview } from './pages/ApplicationReview';
 import { Report } from './pages/Report';
+import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 
 export function App() {
@@ -16,7 +17,7 @@ export function App() {
           <Route path="/applications/:id" element={<ApplicationReview />} />
           <Route path="/applications/:id/review" element={<ApplicationReview />} />
           <Route path="/applications/:id/report" element={<Report />} />
-          <Route path="/reports" element={<Navigate to="/applications/APP-0001/report" replace />} />
+          <Route path="/reports" element={<Reports />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
