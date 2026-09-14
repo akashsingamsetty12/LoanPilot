@@ -1,11 +1,9 @@
 import { useState } from 'react';
-import { Save, Database, Shield, Sliders } from 'lucide-react';
+import { Save, Shield, Sliders } from 'lucide-react';
 import { Topbar } from '../components/layout/Topbar';
 import { Button } from '../components/ui/Button';
 
 export function Settings() {
-  const [useMock, setUseMock] = useState(import.meta.env.VITE_USE_MOCK !== 'false');
-  const [apiUrl, setApiUrl] = useState(import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000');
   const [ocrThreshold, setOcrThreshold] = useState(80);
   const [riskSensitivity, setRiskSensitivity] = useState('STANDARD');
   const [saved, setSaved] = useState(false);
@@ -35,77 +33,6 @@ export function Settings() {
         )}
 
         <form onSubmit={handleSave} className="space-y-6">
-          {/* API & Data Source Config */}
-          <div
-            className="p-6 rounded-2xl"
-            style={{
-              background: '#111111',
-              border: '1px solid rgba(255,255,255,0.06)',
-            }}
-          >
-            <div
-              className="flex items-center gap-3 mb-5 pb-4"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
-            >
-              <div
-                className="w-9 h-9 rounded-xl flex items-center justify-center"
-                style={{ background: 'rgba(170,255,0,0.1)', color: '#AAFF00' }}
-              >
-                <Database className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold" style={{ color: '#F0F0F0' }}>
-                  API & Pipeline Integration
-                </h2>
-                <p className="text-xs" style={{ color: '#666666' }}>
-                  Configure backend connection for OCR, classification, extraction & risk engines
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: '#888888' }}>
-                  Backend API Endpoint Base URL
-                </label>
-                <input
-                  type="text"
-                  value={apiUrl}
-                  onChange={(e) => setApiUrl(e.target.value)}
-                  className="w-full text-sm font-mono px-3.5 py-2.5 rounded-xl transition-all focus:outline-none focus:ring-1"
-                  style={{
-                    background: '#161616',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#F0F0F0',
-                  }}
-                  placeholder="http://localhost:8000/api/v1"
-                />
-              </div>
-
-              <div
-                className="flex items-center justify-between p-4 rounded-xl"
-                style={{
-                  background: '#161616',
-                  border: '1px solid rgba(255,255,255,0.06)',
-                }}
-              >
-                <div>
-                  <p className="text-sm font-medium" style={{ color: '#F0F0F0' }}>
-                    Use Mock Data Mode
-                  </p>
-                  <p className="text-xs" style={{ color: '#666666' }}>
-                    When enabled, frontend uses built-in realistic mock backend responses
-                  </p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={useMock}
-                  onChange={(e) => setUseMock(e.target.checked)}
-                  className="h-5 w-5 rounded cursor-pointer accent-[#AAFF00]"
-                />
-              </div>
-            </div>
-          </div>
 
           {/* Verification Thresholds */}
           <div

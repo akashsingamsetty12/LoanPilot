@@ -30,22 +30,6 @@ export function Topbar({ title, subtitle, children }: TopbarProps) {
       {/* Right: Actions */}
       <div className="flex items-center gap-3">
         {children}
-
-        {/* Status pill */}
-        <div
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
-          style={{
-            background: 'rgba(170,255,0,0.08)',
-            border: '1px solid rgba(170,255,0,0.15)',
-            color: '#AAFF00',
-          }}
-        >
-          <span
-            className="w-1.5 h-1.5 rounded-full animate-pulse"
-            style={{ background: '#AAFF00' }}
-          />
-          AI Active
-        </div>
       </div>
     </header>
   );
