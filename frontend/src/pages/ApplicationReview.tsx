@@ -168,12 +168,19 @@ export function ApplicationReview() {
 
         {/* Action Success Toast/Banner */}
         {actionSuccess && (
-          <div className="p-4 bg-risk-low-light border border-risk-low/30 rounded-lg flex items-center justify-between text-xs font-medium text-risk-low">
+          <div
+            className="p-4 rounded-xl flex items-center justify-between text-xs font-medium"
+            style={{
+              background: 'rgba(48,209,88,0.1)',
+              border: '1px solid rgba(48,209,88,0.25)',
+              color: '#30D158',
+            }}
+          >
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
               <span>{actionSuccess}</span>
             </div>
-            <button onClick={() => setActionSuccess(null)} className="underline text-xs">
+            <button onClick={() => setActionSuccess(null)} className="underline text-xs opacity-80 hover:opacity-100">
               Dismiss
             </button>
           </div>
@@ -183,7 +190,7 @@ export function ApplicationReview() {
         <ApplicationHeader application={application} />
 
         {/* Navigation Tabs */}
-        <div className="border-b border-surface-300 flex items-center gap-4 overflow-x-auto">
+        <div className="flex items-center gap-6 overflow-x-auto" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           {[
             { id: 'overview', label: 'All Review Sections' },
             { id: 'documents', label: `Documents (${application.documents.length})` },
@@ -194,10 +201,18 @@ export function ApplicationReview() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`pb-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === tab.id
-                ? 'border-brand-600 text-brand-600'
-                : 'border-transparent text-charcoal-muted hover:text-charcoal'
-                }`}
+              className="pb-3 text-sm font-medium transition-all duration-150 border-b-2 whitespace-nowrap"
+              style={
+                activeTab === tab.id
+                  ? {
+                      borderColor: '#AAFF00',
+                      color: '#AAFF00',
+                    }
+                  : {
+                      borderColor: 'transparent',
+                      color: '#666666',
+                    }
+              }
             >
               {tab.label}
             </button>
@@ -282,7 +297,7 @@ export function ApplicationReview() {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-surface-200">
+          <div className="flex justify-end gap-3 pt-3 border-t border-white/[0.06]">
             <Button
               variant="outline"
               size="sm"
@@ -312,28 +327,35 @@ export function ApplicationReview() {
       >
         {viewingDoc && (
           <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-surface-50 rounded-lg border border-surface-200 text-xs">
+            <div
+              className="flex flex-wrap items-center justify-between gap-2 p-3.5 rounded-xl text-xs"
+              style={{
+                background: '#181818',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
               <div className="flex items-center gap-4">
                 <div>
-                  <span className="text-charcoal-muted">Type: </span>
-                  <span className="font-semibold text-charcoal capitalize">
+                  <span style={{ color: '#666666' }}>Type: </span>
+                  <span className="font-semibold capitalize" style={{ color: '#F0F0F0' }}>
                     {viewingDoc.type ? viewingDoc.type.replace(/_/g, ' ') : 'Unknown'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-charcoal-muted">Pages: </span>
-                  <span className="font-semibold text-charcoal">{viewingDoc.pages || 1}</span>
+                  <span style={{ color: '#666666' }}>Pages: </span>
+                  <span className="font-semibold" style={{ color: '#F0F0F0' }}>{viewingDoc.pages || 1}</span>
                 </div>
                 <div>
-                  <span className="text-charcoal-muted">OCR Confidence: </span>
-                  <span className="font-semibold text-charcoal">{viewingDoc.ocr_confidence}%</span>
+                  <span style={{ color: '#666666' }}>OCR Confidence: </span>
+                  <span className="font-semibold" style={{ color: '#F0F0F0' }}>{viewingDoc.ocr_confidence}%</span>
                 </div>
               </div>
               <a
                 href={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/documents/${viewingDoc.document_id}/file`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium underline"
+                className="inline-flex items-center gap-1 font-medium hover:underline"
+                style={{ color: '#AAFF00' }}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 Open Raw File in New Tab
@@ -341,7 +363,13 @@ export function ApplicationReview() {
             </div>
 
             {/* In-Browser Document Viewer */}
-            <div className="h-96 w-full bg-surface-100 rounded-lg border border-surface-200 overflow-hidden flex items-center justify-center p-2">
+            <div
+              className="h-96 w-full rounded-xl overflow-hidden flex items-center justify-center p-2"
+              style={{
+                background: '#0A0A0A',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}
+            >
               {viewingDoc.file_name.match(/\.(jpeg|jpg|png|webp|gif)$/i) ? (
                 <img
                   src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'}/documents/${viewingDoc.document_id}/file`}
@@ -359,29 +387,43 @@ export function ApplicationReview() {
 
             {/* Extracted Fields Table */}
             <div>
-              <h4 className="text-xs font-semibold text-charcoal uppercase tracking-wider mb-2">
+              <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: '#555555' }}>
                 Extracted Fields ({viewingDoc.fields?.length || 0})
               </h4>
               {viewingDoc.fields && viewingDoc.fields.length > 0 ? (
-                <div className="max-h-48 overflow-y-auto border border-surface-200 rounded-lg divide-y divide-surface-200 bg-white">
+                <div
+                  className="max-h-48 overflow-y-auto rounded-xl divide-y"
+                  style={{
+                    background: '#161616',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    borderColor: 'rgba(255,255,255,0.04)',
+                  }}
+                >
                   {viewingDoc.fields.map((f, idx) => (
-                    <div key={idx} className="p-2.5 flex items-center justify-between text-xs">
-                      <span className="text-charcoal-muted font-medium">{f.field_name}</span>
+                    <div key={idx} className="p-3 flex items-center justify-between text-xs">
+                      <span className="font-medium" style={{ color: '#888888' }}>{f.field_name}</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-charcoal">{f.value}</span>
-                        <span className="text-[10px] text-charcoal-muted">({f.confidence}%)</span>
+                        <span className="font-semibold" style={{ color: '#F0F0F0' }}>{f.value}</span>
+                        <span className="text-[10px]" style={{ color: '#555555' }}>({f.confidence}%)</span>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-charcoal-muted italic p-3 bg-surface-50 rounded border border-surface-200">
+                <p
+                  className="text-xs italic p-3 rounded-lg"
+                  style={{
+                    background: '#161616',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                    color: '#666666',
+                  }}
+                >
                   No structured fields extracted from this document yet.
                 </p>
               )}
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-surface-200">
+            <div className="flex justify-end pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <Button variant="outline" size="sm" onClick={() => setViewingDoc(null)}>
                 Close Preview
               </Button>
