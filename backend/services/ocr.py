@@ -152,6 +152,15 @@ def ocr_image(
         output_type=pytesseract.Output.DICT,
         config="--psm 6"
     )
+    words = [w.strip() for w in data["text"] if w.strip()]
+    if len(words) < 5:
+        data_auto = pytesseract.image_to_data(
+            processed_image,
+            output_type=pytesseract.Output.DICT
+        )
+        words_auto = [w.strip() for w in data_auto["text"] if w.strip()]
+        if len(words_auto) > len(words):
+            data = data_auto
 
     text_parts = []
     evidence = []
@@ -260,26 +269,54 @@ async def extract_text_from_pdf(
             # ---------------------------------------------
 
             else:
+                import io
+                embedded_texts = []
+                embedded_evidences = []
 
+                # High-resolution native embedded image OCR
+                for img_info in page.get_images():
+                    try:
+                        xref = img_info[0]
+                        base_image = pdf.extract_image(xref)
+                        if base_image and "image" in base_image:
+                            emb_img = Image.open(io.BytesIO(base_image["image"]))
+                            if emb_img.width > 80 and emb_img.height > 80:
+                                res_emb = ocr_image(emb_img, page_number)
+                                if res_emb.get("text"):
+                                    embedded_texts.append(res_emb["text"])
+                                    embedded_evidences.extend(res_emb.get("evidence", []))
+
+                                # Also crop right 75% for ID cards with photo on left
+                                w, h = emb_img.size
+                                if w > 500 and h > 300:
+                                    crop_right = emb_img.crop((w * 0.25, 0, w, h))
+                                    res_crop = ocr_image(crop_right, page_number)
+                                    if res_crop.get("text"):
+                                        embedded_texts.append(res_crop["text"])
+                                        embedded_evidences.extend(res_crop.get("evidence", []))
+                    except Exception:
+                        pass
+
+                # Also render whole page at Matrix(3, 3)
                 pix = page.get_pixmap(
-                    matrix=pymupdf.Matrix(2, 2),
+                    matrix=pymupdf.Matrix(3, 3),
                     alpha=False
                 )
+                page_img = Image.open(io.BytesIO(pix.tobytes("png")))
+                page_result = ocr_image(page_img, page_number)
 
-                image_bytes = pix.tobytes("png")
-
-                import io
-
-                image = Image.open(
-                    io.BytesIO(image_bytes)
-                )
-
-                result = ocr_image(
-                    image,
-                    page_number
-                )
-
-                result["extraction_method"] = "tesseract"
+                if embedded_texts:
+                    combined_text = "\n".join(embedded_texts + ([page_result["text"]] if page_result.get("text") else [])).strip()
+                    result = {
+                        "page": page_number,
+                        "text": combined_text,
+                        "confidence": 0.95,
+                        "evidence": embedded_evidences + page_result.get("evidence", []),
+                        "extraction_method": "tesseract"
+                    }
+                else:
+                    result = page_result
+                    result["extraction_method"] = "tesseract"
 
                 pages.append(result)
 

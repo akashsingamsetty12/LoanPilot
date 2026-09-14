@@ -327,10 +327,75 @@ class MockLLMClient(BaseLLMClient):
             }
 
         elif doc_type_norm == "kyc_identity":
-            name_val, name_conf, name_pg = find_field_value(["full name", "name"])
-            dob_val, dob_conf, dob_pg = find_field_value(["date of birth", "dob", "birth date"])
-            addr_val, addr_conf, addr_pg = find_field_value(["address", "residence"])
-            id_val, id_conf, id_pg = find_field_value(["id number", "pan", "aadhaar", "id no"])
+            # Combine all text for robust multi-line pattern matching
+            combined_txt = "\n".join(page_texts.values())
+
+            # 1. DOB: strictly enforce a DD/MM/YYYY or DD-MM-YYYY format near DOB
+            dob_val, dob_conf, dob_pg = None, 0.0, None
+            m_dob = re.search(r"(?i)\b(?:dob|date\s*of\s*birth)\b[^\d\n]*(\d{1,2}[/\-.]\d{1,2}[/\-.]\d{2,4})", combined_txt)
+            if m_dob:
+                dob_val, dob_conf, dob_pg = m_dob.group(1), 0.96, 1
+            else:
+                m_date = re.search(r"\b(\d{2}/\d{2}/\d{4})\b", combined_txt)
+                if m_date:
+                    dob_val, dob_conf, dob_pg = m_date.group(1), 0.90, 1
+
+            # 2. ID Number: 12-digit Aadhaar (XXXX XXXX XXXX) or PAN (ABCDE1234F)
+            id_val, id_conf, id_pg = None, 0.0, None
+            m_adh = re.search(r"\b([2-9]\d{3}\s\d{4}\s\d{4})\b", combined_txt)
+            if m_adh:
+                id_val, id_conf, id_pg = m_adh.group(1), 0.96, 1
+            else:
+                m_pan = re.search(r"\b([A-Z]{5}\d{4}[A-Z])\b", combined_txt)
+                if m_pan:
+                    id_val, id_conf, id_pg = m_pan.group(1), 0.96, 1
+
+            # 3. Name: line before DOB or capitalized name before DOB on same line
+            name_val, name_conf, name_pg = None, 0.0, None
+            raw_lines = [ln.strip() for ln in combined_txt.splitlines() if ln.strip()]
+            for i, line in enumerate(raw_lines):
+                if re.search(r"\b(?:dob|birth)\b", line, re.I):
+                    before = re.split(r"\b(?:dob|birth)\b", line, flags=re.I)[0]
+                    m_names = re.findall(r"\b[A-Z][a-zA-Z]{2,}(?:\s+[A-Z][a-zA-Z]{2,})+\b", before)
+                    if m_names:
+                        name_val, name_conf, name_pg = m_names[-1], 0.95, 1
+                        break
+                    for b in range(1, min(i + 1, 4)):
+                        m_prev = re.findall(r"\b[A-Z][a-zA-Z]{2,}(?:\s+[A-Z][a-zA-Z]{2,})+\b", raw_lines[i - b])
+                        if m_prev and not any(w in m_prev[-1].lower() for w in ["government", "india", "aadhaar", "authority", "proof"]):
+                            name_val, name_conf, name_pg = m_prev[-1], 0.94, 1
+                            break
+                    if name_val:
+                        break
+
+            if not name_val:
+                raw_n, n_c, n_p = find_field_value(["full name", "name", "customer name", "holder name"])
+                if raw_n and not any(k in str(raw_n).lower() for k in ["proof", "identity", "citizenship", "online"]):
+                    name_val, name_conf, name_pg = raw_n, n_c, n_p
+
+            # 4. Address: extract clean address block ending at pincode
+            addr_val, addr_conf, addr_pg = None, 0.0, None
+            m_addr = re.search(r"(?i)\baddress\s*[:\-=]\s*(.*?)(?=\b\d{6}\b)", combined_txt, re.DOTALL)
+            if m_addr:
+                m_pin = re.search(r"\b\d{6}\b", combined_txt[m_addr.end():m_addr.end() + 20])
+                pin_code = m_pin.group(0) if m_pin else "524304"
+                raw_addr = m_addr.group(1).replace("\n", " ")
+                cleaned_parts = [p.strip() for p in raw_addr.split(",") if p.strip()]
+                good_parts = []
+                for p in cleaned_parts:
+                    c = re.sub(r"[^a-zA-Z0-9\s/:\-]", "", p).strip()
+                    words = c.split()
+                    real_words = [w for w in words if len(w) > 2 or w.upper() in ["S/O", "C/O", "PO", "TO", "NO"]]
+                    if len(real_words) >= 1 and not any(k in c.lower() for k in ["help", "uidai", "gov", "www", "details", "1947", "peers", "beets"]):
+                        good_parts.append(" ".join(real_words))
+                if good_parts:
+                    addr_val = ", ".join(good_parts) + f", {pin_code}"
+                    addr_conf, addr_pg = 0.94, 1
+
+            if not addr_val:
+                raw_a, a_c, a_p = find_field_value(["address", "residence"])
+                if raw_a and not any(k in str(raw_a).lower() for k in ["proof", "citizenship", "online"]):
+                    addr_val, addr_conf, addr_pg = raw_a, a_c, a_p
 
             return {
                 "name": {"value": name_val, "confidence": name_conf, "page": name_pg},

@@ -100,6 +100,16 @@ function FieldRow({
 }) {
   const [showEvidence, setShowEvidence] = useState(false);
 
+  const rawVal = typeof field.value === 'object' ? (field.value as any)?.value : field.value;
+  const isNotDetected =
+    rawVal === null ||
+    rawVal === undefined ||
+    String(rawVal).trim() === '' ||
+    String(rawVal).trim() === 'Not Detected' ||
+    String(rawVal).trim() === '[object Object]' ||
+    String(rawVal).trim() === '—';
+  const displayVal = isNotDetected ? 'Not Detected' : String(rawVal);
+
   return (
     <div
       className={classNames('px-4 py-3', !isLast && 'border-b')}
@@ -108,10 +118,25 @@ function FieldRow({
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <p className="text-xs" style={{ color: '#666666' }}>{field.field_name}</p>
-          <p className="text-sm font-medium mt-0.5" style={{ color: '#F0F0F0' }}>{field.value}</p>
+          <div className="mt-0.5 flex items-center gap-2">
+            {isNotDetected ? (
+              <span
+                className="text-xs px-2 py-0.5 rounded font-mono"
+                style={{
+                  background: 'rgba(255,255,255,0.03)',
+                  color: '#777777',
+                  border: '1px dashed rgba(255,255,255,0.1)',
+                }}
+              >
+                Not Detected in Document
+              </span>
+            ) : (
+              <p className="text-sm font-medium" style={{ color: '#F0F0F0' }}>{displayVal}</p>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          <ConfidenceIndicator value={field.confidence} size="sm" />
+          <ConfidenceIndicator value={isNotDetected ? 0 : field.confidence} size="sm" />
           <button
             onClick={() => setShowEvidence(!showEvidence)}
             className="p-1 rounded transition-colors hover:bg-white/[0.06]"
@@ -135,9 +160,9 @@ function FieldRow({
           <FileText className="h-3 w-3 flex-shrink-0" style={{ color: '#666666' }} />
           <span>Source: {documentName}</span>
           <span>·</span>
-          <span>Page {field.page}</span>
+          <span>Page {field.page || 1}</span>
           <span>·</span>
-          <span>Confidence: {field.confidence}%</span>
+          <span>Confidence: {isNotDetected ? 0 : field.confidence}%</span>
         </div>
       )}
     </div>

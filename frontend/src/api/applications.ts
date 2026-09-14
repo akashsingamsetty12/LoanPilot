@@ -27,12 +27,55 @@ function normalizeApplication(data: any): Application {
     ocr_confidence: Math.round((d.ocr_confidence || 0) <= 1 ? (d.ocr_confidence || 0.9) * 100 : d.ocr_confidence),
     file_size: d.file_size || 1024,
     uploaded_at: d.uploaded_at || d.created_at || new Date().toISOString(),
-    fields: d.fields || (d.extracted_fields ? Object.entries(d.extracted_fields).map(([k, v]: [string, any]) => ({
-      field_name: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      value: String(v?.value ?? v ?? ''),
-      confidence: Math.round((v?.confidence ?? 0.9) <= 1 ? (v?.confidence ?? 0.9) * 100 : (v?.confidence ?? 90)),
-      page: v?.page ?? 1
-    })) : [])
+    fields: (() => {
+      if (Array.isArray(d.fields) && d.fields.length > 0) {
+        return d.fields.map((f: any) => {
+          let val = f.value;
+          if (val && typeof val === 'object') {
+            val = val.value !== undefined ? val.value : null;
+          }
+          const displayVal = (val === null || val === undefined || String(val).trim() === '' || String(val).trim() === '[object Object]')
+            ? 'Not Detected'
+            : String(val);
+          const rawConf = typeof f.confidence === 'number' ? f.confidence : (f.value?.confidence ?? 0.9);
+          const conf = Math.round(rawConf <= 1 ? rawConf * 100 : rawConf);
+          return {
+            field_name: f.field_name || 'Field',
+            value: displayVal,
+            confidence: conf,
+            page: f.page || f.value?.page || 1
+          };
+        });
+      }
+
+      if (d.extracted_fields && typeof d.extracted_fields === 'object') {
+        return Object.entries(d.extracted_fields).map(([k, v]: [string, any]) => {
+          let val = v;
+          let conf = 0.9;
+          let page = 1;
+
+          if (v && typeof v === 'object') {
+            val = v.value;
+            conf = typeof v.confidence === 'number' ? v.confidence : 0.9;
+            page = v.page || 1;
+          }
+
+          const displayVal = (val === null || val === undefined || String(val).trim() === '' || String(val).trim() === '[object Object]')
+            ? 'Not Detected'
+            : String(val);
+          const confPercent = Math.round(conf <= 1 ? conf * 100 : conf);
+
+          return {
+            field_name: k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            value: displayVal,
+            confidence: confPercent,
+            page: page
+          };
+        });
+      }
+
+      return [];
+    })()
   }));
 
   // Format risk
